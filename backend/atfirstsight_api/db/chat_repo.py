@@ -153,7 +153,7 @@ class ChatsRepo:
 
             chat_previews = []
             for row in rows:
-                # We need to manually construct the nested Pydantic models
+                # We need to manually construct the nested Pydantic api_models
                 # from the flat SQL row (as a dict)
                 row_dict = dict(row)
                 

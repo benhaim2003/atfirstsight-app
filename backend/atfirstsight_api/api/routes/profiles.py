@@ -8,7 +8,7 @@ from fastapi import APIRouter, UploadFile, File, Depends
 from atfirstsight_api.api.dependencies.auth import UserDep, get_user
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.api.dependencies.storage import StorageDep
-from atfirstsight_api.api.models.profiles import ProfileCreate
+from atfirstsight_api.api.api_models.profiles import ProfileCreate
 from atfirstsight_api.models.profiles import Profile, ProfileStatus, ProfilePhoto
 from atfirstsight_api.storage.storage import PROFILE_PHOTOS_BUCKET
 

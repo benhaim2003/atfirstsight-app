@@ -103,7 +103,7 @@ async def get_user_chat_list(
 )
 async def send_message(
         chat_id: uuid.UUID,
-        message_in: MessageCreate,  # Assuming you added this to your models
+        message_in: MessageCreate,  # Assuming you added this to your api_models
         db: DBDep,
         current_user: UserDep,
 ):
