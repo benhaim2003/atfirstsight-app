@@ -15,5 +15,6 @@ async def lifespan(app: FastAPI) -> Generator[None, None, None]:
     app.state.db = DB(connection)
 
     supabase_client = await create_async_client(settings.supabase.url, settings.supabase.service_key)
+    app.state.supabase = supabase_client
     app.state.storage = Storage(supabase_client)
     yield
