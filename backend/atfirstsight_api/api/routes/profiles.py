@@ -13,6 +13,9 @@ from atfirstsight_api.storage.storage import PROFILE_PHOTOS_BUCKET
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
+@router.get("/{profile_id}")
+async def get_profile(profile: ProfileDep) -> Profile:
+    return profile
 
 @router.post("")
 async def register_profile(
