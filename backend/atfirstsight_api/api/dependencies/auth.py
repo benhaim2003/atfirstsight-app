@@ -42,13 +42,10 @@ UserDep = Annotated[User, Depends(get_user)]
 
 async def get_profile(
         profile_id: str,
-        user: UserDep,
+        _: UserDep,
         db: DBDep
 ) -> Profile:
-    try:
-        return await db.profiles.get_profile(profile_id)
-    except ItemNotFoundException:
-        raise HTTPException(status_code=404, detail=f"profile with id: '{user.id}' not found")
+    return await db.profiles.get_profile(profile_id)
 
 
 ProfileDep = Annotated[Profile, Depends(get_profile)]
