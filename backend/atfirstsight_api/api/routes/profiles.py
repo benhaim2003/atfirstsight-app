@@ -1,8 +1,7 @@
 import hashlib
 import os
-import uuid
-from uuid import UUID
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, UploadFile, File, Depends
 
@@ -66,6 +65,18 @@ async def upload_profile_photo(
         profile.id,
         ProfilePhoto(storage_path=storage_path, sort_order=len(profile.photos) + 1)
     )
+
+
+@router.delete("/{profile_id}/photos/{profile_photo_id}")
+async def delete_profile_photo(
+        profile_photo_id: UUID,
+        _: ProfileDep,
+        db: DBDep,
+        storage: StorageDep,
+) -> None:
+    profile_photo = await db.profiles.get_profile_photo(profile_photo_id)
+    await db.profiles.delete_profile_photo(profile_photo_id)
+    await storage.delete_file(PROFILE_PHOTOS_BUCKET, profile_photo.storage_path)
 
 
 async def _get_file_hash(file: UploadFile) -> str:
