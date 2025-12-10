@@ -1,21 +1,31 @@
 import os
 import uuid
+from uuid import UUID
+from typing import Annotated
 
-from fastapi import APIRouter
-from fastapi import UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
 
-from atfirstsight_api.api.dependencies.auth import UserDep, ProfileDep
+from atfirstsight_api.api.dependencies.auth import UserDep, get_user
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.api.dependencies.storage import StorageDep
 from atfirstsight_api.api.models.profiles import ProfileCreate
 from atfirstsight_api.models.profiles import Profile, ProfileStatus, ProfilePhoto
 from atfirstsight_api.storage.storage import PROFILE_PHOTOS_BUCKET
 
-router = APIRouter(prefix="/profiles", tags=["profiles"])
+router = APIRouter(prefix="/profiles", tags=["profiles"], dependencies=[Depends(get_user)])
+
+
+async def get_profile(profile_id: UUID, db: DBDep) -> Profile:
+    return await db.profiles.get_profile(profile_id)
+
+
+ProfileDep = Annotated[Profile, Depends(get_profile)]
+
 
 @router.get("/{profile_id}")
 async def get_profile(profile: ProfileDep) -> Profile:
     return profile
+
 
 @router.post("")
 async def register_profile(

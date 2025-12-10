@@ -4,9 +4,6 @@ import aiohttp
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from atfirstsight_api.api.dependencies.db import DBDep
-from atfirstsight_api.db.exceptions import ItemNotFoundException
-from atfirstsight_api.models.profiles import Profile
 from atfirstsight_api.models.users import User
 from atfirstsight_api.settings import settings
 
@@ -38,14 +35,3 @@ async def get_user(
 
 
 UserDep = Annotated[User, Depends(get_user)]
-
-
-async def get_profile(
-        profile_id: str,
-        _: UserDep,
-        db: DBDep
-) -> Profile:
-    return await db.profiles.get_profile(profile_id)
-
-
-ProfileDep = Annotated[Profile, Depends(get_profile)]
