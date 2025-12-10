@@ -1,3 +1,4 @@
+import hashlib
 import os
 import uuid
 from uuid import UUID
@@ -52,14 +53,22 @@ async def upload_profile_photo(
         storage: StorageDep,
         file: UploadFile = File(...)
 ) -> None:
-    storage_path = f"{profile.id}-{uuid.uuid4().hex[:4]}.{os.path.splitext(file.filename)[1]}"
+    file_hash = await _get_file_hash(file)
+    file_extension = os.path.splitext(file.filename)[1]
+    storage_path = f"{profile.id}-{file_hash}{file_extension}"
     await storage.upload_file(
         PROFILE_PHOTOS_BUCKET,
         storage_path,
         file.file.read(),
         file.content_type
     )
-    db.profiles.insert_profile_photo(
+    await db.profiles.insert_profile_photo(
         profile.id,
         ProfilePhoto(storage_path=storage_path, sort_order=len(profile.photos) + 1)
     )
+
+
+async def _get_file_hash(file: UploadFile) -> str:
+    h = hashlib.new("sha256")
+    h.update(await file.read())
+    return h.hexdigest()
