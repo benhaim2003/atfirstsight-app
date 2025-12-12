@@ -55,7 +55,7 @@ async def upload_profile_photo(
     file_content = await file.read()
     file_hash = await _get_file_hash(file_content)
     file_extension = os.path.splitext(file.filename)[1]
-    storage_path = f"{profile.id}-{file_hash}{file_extension}"
+    storage_path = f"{profile.id}/{file_hash}{file_extension}"
     await storage.upload_file(
         PROFILE_PHOTOS_BUCKET,
         storage_path,
