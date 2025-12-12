@@ -52,13 +52,14 @@ async def upload_profile_photo(
         storage: StorageDep,
         file: UploadFile = File(...)
 ) -> None:
-    file_hash = await _get_file_hash(file)
+    file_content = await file.read()
+    file_hash = await _get_file_hash(file_content)
     file_extension = os.path.splitext(file.filename)[1]
     storage_path = f"{profile.id}-{file_hash}{file_extension}"
     await storage.upload_file(
         PROFILE_PHOTOS_BUCKET,
         storage_path,
-        file.file.read(),
+        file_content,
         file.content_type
     )
     await db.profiles.insert_profile_photo(
@@ -79,7 +80,7 @@ async def delete_profile_photo(
     await storage.delete_file(PROFILE_PHOTOS_BUCKET, profile_photo.storage_path)
 
 
-async def _get_file_hash(file: UploadFile) -> str:
+async def _get_file_hash(file_content: bytes) -> str:
     h = hashlib.new("sha256")
-    h.update(await file.read())
+    h.update(file_content)
     return h.hexdigest()
