@@ -13,7 +13,7 @@ export interface ProfilePhoto {
   id: string;
   storage_path: string;
   sort_order: number;
-  uploaded_at: string; 
+  uploaded_at: Date;
 }
 
 export interface Profile {
@@ -21,9 +21,9 @@ export interface Profile {
   username: string;
   bio: string;
   gender: Gender;
-  birth_date: string; 
+  birth_date: Date;
   status: ProfileStatus;
   photos: ProfilePhoto[];
-  created_at: string; 
-  updated_at: string; 
+  created_at: Date;
+  updated_at: Date;
 }
