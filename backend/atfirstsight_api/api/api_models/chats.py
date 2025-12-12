@@ -1,14 +1,14 @@
 from uuid import UUID
 from pydantic import BaseModel
 
-from backend.atfirstsight_api.models.chat import MessageType
+from backend.atfirstsight_api.models.chats import MessageType
 
 
 class MessageCreate(BaseModel):
-    content: str
     chat_id: UUID
-    msg_type: MessageType
+    type: MessageType
+    content: str
     
 class MarkReadRequest(BaseModel):
-    conversation_id: UUID
+    chat_id: UUID
     last_read_message_id: UUID
