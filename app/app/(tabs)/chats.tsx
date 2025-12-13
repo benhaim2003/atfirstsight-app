@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function ExploreScreen() {
+export default function ChatListScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Explore Engine 🧭</Text>
-      <Text>Shows nearby users open to a "בקשת גישה".</Text>
+      <Text style={styles.title}>Chat List 💬</Text>
+      <Text>Only verified, in-person meetings unlock this chat.</Text>
     </View>
   );
 }

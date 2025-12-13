@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function ExploreScreen() {
+export default function ProfileScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Explore Engine 🧭</Text>
-      <Text>Shows nearby users open to a "בקשת גישה".</Text>
+      <Text style={styles.title}>Profile & Settings 👤</Text>
+      <Text>User details, preferences, and sign-out.</Text>
     </View>
   );
 }
