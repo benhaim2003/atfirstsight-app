@@ -1,186 +1,135 @@
 from uuid import UUID
 
 from asyncpg import Connection
-from asyncpg.exceptions import PostgresError, UniqueViolationError
-# Make sure your custom exceptions are importable
-from atfirstsight_api.db.exceptions import (DBException,
-                                            DuplicateItemException,
-                                            ItemNotFoundException)
-from atfirstsight_api.models.chat import Chat, Message
-from atfirstsight_api.models.chats import (ChatParticipant, ChatPreview,
-                                           LastMessage)
+from asyncpg.exceptions import PostgresError
+
+from atfirstsight_api.db.exceptions import (DBException)
+from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
 
 class ChatsRepo:
     def __init__(self, connection: Connection) -> None:
         self._connection = connection
 
-    async def get_chat_by_id(self, chat_id: UUID) -> Chat:
-        """Fetches a single chat room by its ID."""
+    async def get_chats_by_user_id(self, user_id: UUID) -> list[Chat]:
+        chats_list_query = """
+                           WITH user_chats AS (SELECT id      as chat_id,
+                                                      CASE
+                                                          WHEN profile_a_id = $1 THEN profile_b_id
+                                                          ELSE profile_a_id
+                                                          END as profile_b_id,
+                                                      created_at,
+                                                      updated_at
+                                               FROM public.chats
+                                               WHERE profile_a_id = $1
+                                                  OR profile_b_id = $1),
+                                latest_message AS (SELECT *
+                                                   FROM (SELECT *,
+                                                                ROW_NUMBER() OVER(PARTITION BY chat_id ORDER BY created_at DESC) as rn
+                                                         FROM public.messages
+                                                         WHERE chat_id IN (SELECT chat_id FROM user_chats)) as ranked_messages
+                                                   WHERE rn = 1)
+
+                           SELECT uc.chat_id,
+                                  uc.created_at,
+                                  uc.updated_at,
+                                  p.id            as other_profile_id,
+                                  p.username      as other_username,
+                                  pp.storage_path as other_primary_photo_url,
+                                  lm.id           as last_message_id,
+                                  lm.sender_id    as last_message_sender_id,
+                                  lm.content      as last_message_content,
+                                  lm.created_at   as last_message_created_at,
+                                  lm.read_at      as last_message_read_at,
+                                  lm.msg_type     as last_message_msg_type,
+                                  lm.metadata     as last_message_metadata
+                           FROM user_chats uc
+                                    LEFT JOIN public.profiles p
+                                              ON uc.profile_b_id = p.id
+                                    LEFT JOIN latest_message lm
+                                              ON uc.chat_id = lm.chat_id
+                                    LEFT JOIN public.profile_photo pp
+                                              ON p.id = pp.profile_id
+                           ORDER BY lm.created_at DESC NULLS LAST; \
+                           """
+
+        user_profile_query = """
+                             SELECT p.id,
+                                    p.username,
+                                    pp.storage_path
+                             FROM public.profiles p
+                                      LEFT JOIN public.profile_photo pp
+                                                on p.id = pp.profile_id
+                             WHERE p.id = $1 \
+                             """
+
         try:
-            chat_row = await self._connection.fetchrow(
-                """
-                SELECT * FROM public.chats
-                WHERE id = $1
-                """,
-                chat_id,
+            participant_a_data = await self._connection.fetch(user_profile_query, user_id)
+            participant_a_dict = dict(participant_a_data[0])
+            participant_a = ChatParticipant(
+                profile_id=participant_a_dict.get('id'),
+                username=participant_a_dict.get('username'),
+                primary_photo_url=participant_a_dict.get('storage_path')
             )
-            if not chat_row:
-                raise ItemNotFoundException(f"Chat with id: '{chat_id}' not found")
 
-            # Chat model is a flat structure, so we can validate directly
-            return Chat.model_validate(dict(chat_row))
-
-        except PostgresError as e:
-            raise DBException("Failed getting chat from db") from e
-
-    async def get_messages_by_chat_id(
-        self, chat_id: UUID, limit: int = 50
-    ) -> list[Message]:
-        """Fetches the N most recent messages for a chat."""
-        try:
-            message_rows = await self._connection.fetch(
-                """
-                SELECT * FROM public.messages
-                WHERE chat_id = $1
-                ORDER BY created_at DESC
-                LIMIT $2
-                """,
-                chat_id,
-                limit,
-            )
-
-            # We fetch newest-first (DESC), but the UI needs oldest-first.
-            # We reverse the list before validating.
-            return [
-                Message.model_validate(dict(row)) for row in reversed(message_rows)
-            ]
-
-        except PostgresError as e:
-            raise DBException("Failed getting messages from db") from e
-
-    # NEW, MODIFIED code
-    async def insert_message(self, message: Message) -> Message:
-        """
-        Inserts a new message into the database and
-        returns the newly created message.
-        """
-        try:
-            new_row = await self._connection.fetchrow( # <-- 1. Use fetchrow
-                """
-                INSERT INTO public.messages
-                (id, chat_id, sender_id, content, created_at)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING *; 
-                """, # <-- 2. Added RETURNING *
-                message.id,
-                message.chat_id,
-                message.sender_id,
-                message.content,
-                message.created_at,
-            )
-            if not new_row:
-                raise DBException("Failed to create message, no row returned")
-            
-            # 3. Validate and return the new message
-            return Message.model_validate(dict(new_row))
-
-        except UniqueViolationError as e:
-            raise DuplicateItemException(
-                f"Duplicate message id: '{message.id}'"
-            ) from e
-        except PostgresError as e:
-            raise DBException("Failed inserting message to db") from e
-    
-    async def get_chats_by_user_id(self, user_id: UUID) -> list[ChatPreview]:
-        """
-        Fetches all chat previews for a given user, including the
-        other participant's details and the last message sent.
-        """
-        
-        # This query does all the work:
-        # 1. Finds all chats for the user.
-        # 2. Identifies the "other" participant's ID.
-        # 3. Joins with `profiles` to get the other participant's details.
-        # 4. Uses a `LEFT JOIN` on a subquery to get the *last message* for each chat.
-        sql_query = """
-        WITH user_chats AS (
-            -- 1. Find all chats for the current user and identify the "other" profile
-            SELECT
-                id as chat_id,
-                CASE
-                    WHEN profile_a_id = $1 THEN profile_b_id
-                    ELSE profile_a_id
-                END as other_participant_id
-            FROM public.chats
-            WHERE profile_a_id = $1 OR profile_b_id = $1
-        ),
-        latest_message AS (
-            -- 2. Find the last message for each chat
-            SELECT
-                chat_id,
-                content,
-                created_at,
-                sender_id
-            FROM (
-                SELECT
-                    chat_id,
-                    content,
-                    created_at,
-                    sender_id,
-                    ROW_NUMBER() OVER(PARTITION BY chat_id ORDER BY created_at DESC) as rn
-                FROM public.messages
-                WHERE chat_id IN (SELECT chat_id FROM user_chats)
-            ) as ranked_messages
-            WHERE rn = 1
-        )
-        -- 3. Join everything together
-        SELECT
-            uc.chat_id,
-            p.id as other_profile_id,
-            p.username as other_username,
-            lm.content as last_message_content,
-            lm.created_at as last_message_created_at,
-            lm.sender_id as last_message_sender_id
-        FROM user_chats uc
-        LEFT JOIN public.profiles p ON uc.other_participant_id = p.id
-        LEFT JOIN latest_message lm ON uc.chat_id = lm.chat_id
-        ORDER BY lm.created_at DESC NULLS LAST; -- Show newest chats first
-        """
-
-        try:
-            rows = await self._connection.fetch(sql_query, user_id)
-
+            rows = await self._connection.fetch(chats_list_query, user_id)
             chat_previews = []
             for row in rows:
-                # We need to manually construct the nested Pydantic api_models
-                # from the flat SQL row (as a dict)
                 row_dict = dict(row)
-                
-                other_participant = ChatParticipant(
+
+                participant_b = ChatParticipant(
                     profile_id=row_dict.get('other_profile_id'),
                     username=row_dict.get('other_username'),
+                    primary_photo_url=row_dict.get('other_primary_photo_url')
                 )
 
-                last_message = None
-                if row_dict.get('last_message_content'):
-                    last_message = LastMessage(
+                chat = Chat(
+                    id=row_dict.get('chat_id'),
+                    participant_a=participant_a,
+                    participant_b=participant_b,
+                    created_at=row_dict.get('created_at'),
+                    updated_at=row_dict.get('updated_at')
+                )
+
+                if row_dict.get('last_message_id'):
+                    last_message = Message(
+                        id=row_dict.get('last_message_id'),
+                        chat_id=row_dict.get('chat_id'),
+                        sender_id=row_dict.get('last_message_sender_id'),
                         content=row_dict.get('last_message_content'),
                         created_at=row_dict.get('last_message_created_at'),
-                        sender_id=row_dict.get('last_message_sender_id')
+                        read_at=row_dict.get('last_message_read_at'),
+                        msg_type=row_dict.get('last_message_msg_type'),
+                        metadata=row_dict.get('last_message_metadata')
                     )
+                else:
+                    last_message = None
 
                 chat_previews.append(
-                    ChatPreview(
-                        chat_id=row_dict.get('chat_id'),
-                        other_participant=other_participant,
-                        last_message=last_message,
-                        unread_count=0  # Stubbed for now
+                    ChatsListItem(
+                        chat=chat,
+                        last_message=last_message
                     )
                 )
 
             return chat_previews
 
         except PostgresError as e:
-            # You should log the error `e` here
             raise DBException(f"Failed getting chat list from db, {e}") from e
+
+    async def post_chat(self, users_ids: list[UUID]) -> str:
+        post_chat_query = """
+                          INSERT INTO public.chats (profile_a_id, profile_b_id)
+                          VALUES ($1, $2)
+                          RETURNING id;
+                          """
+
+        users_ids = sorted(users_ids)
+        user_a_id = users_ids[0]
+        user_b_id = users_ids[1]
+
+        try:
+            chat_id = await self._connection.fetchval(post_chat_query, user_a_id, user_b_id)
+            return str(chat_id)
+        except PostgresError as e:
+            raise DBException(f"Failed creating chat in db, {e}") from e
