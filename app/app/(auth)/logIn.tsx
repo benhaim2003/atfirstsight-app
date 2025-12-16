@@ -1,28 +1,28 @@
 import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, TextInput, Button } from 'react-native';
 import { use, useState } from 'react';
-import signIn from '@/src/services/authServices'
+import logIn from '@/src/services/authServices'
 import { User } from '@/src/types/user'
 import { useUserStore } from '@/src/store/useUserStore';
 
-export default function SignInScreen() {
-  console.log("IN SCREEN OF SIGN IN")
+export default function LogInScreen() {
+  console.log("IN SCREEN OF Log In")
   
   const router = useRouter()
   const setUser = useUserStore((state) => state.setUser);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSignIn = () => {
-    const user: User = signIn(email, password);
-    console.log("Sign in successful - email: ", user.email)
+  const handleLogIn = () => {
+    const user: User = logIn(email, password);
+    console.log("Log In successful - email: ", user.email)
     setUser(user);
-    router.push("/(auth)/profileCreation")
+    router.push("/profileCreation")
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign In 🧭</Text>
+      <Text style={styles.title}>Log In 🧭</Text>
       <Text>Email:</Text>
       <TextInput 
         placeholder="Enter your email" 
@@ -39,7 +39,7 @@ export default function SignInScreen() {
         value={password}
         onChangeText={setPassword}
       />
-      <Button title="Sign In" onPress={handleSignIn} />
+      <Button title="Log In" onPress={handleLogIn} />
     </View>
   );
 }

@@ -16,7 +16,7 @@ export default function AuthLayout() {
       <Stack.Protected guard={!hasUser}>
 
       </Stack.Protected>
-        <Stack.Screen name="signIn"/>
+        <Stack.Screen name="logIn"/>
       <Stack.Protected guard={!hasProfile}>
         <Stack.Screen name="profileCreation"/>  
       </Stack.Protected>        
