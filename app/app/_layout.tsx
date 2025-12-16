@@ -1,28 +1,17 @@
 import { Redirect, Stack } from "expo-router";
-import { UserState, UserAuthState } from "@/types/user";
 import { useUserStore } from "@/src/store/useUserStore";
 
-
 export default function RootLayout() {
-  const userAuthState = useUserStore((state) => state.userAuthState);
+  const hasUser = useUserStore((state) => state.hasUser);
+  const hasProfile = useUserStore((state) => state.hasProfile);  
 
-  if (userAuthState === UserAuthState.Guest)
-  {
-    return <Redirect href="./(auth)/signIn" />;
-  }
-
-  if (userAuthState === UserAuthState.User)
-  {
-    return <Redirect href="./(auth)/profileCreation" />;
-  }
-  
   return (
-      <Stack>
-        <Stack.Screen
-          name="(tabs)"
-          options={{
-            headerTitle: "Main Title",}}
-        />
-      </Stack>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={hasUser && hasProfile}>
+          <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Screen name="(auth)" />
+    </Stack>
   );
 }
+      
