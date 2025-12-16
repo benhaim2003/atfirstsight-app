@@ -11,10 +11,12 @@ class MessageType(str, Enum):
     IMAGE = "image"
     AUDIO = "audio"
 
+
 class ImageMetaData(BaseModel):
     width: int
     height: int
     aspect_ratio: str
+
 
 class AudioMetaData(BaseModel):
     duration_seconds: float
@@ -51,7 +53,8 @@ Message = Union[TextMessage, ImageMessage, AudioMessage]
 class ChatParticipant(BaseModel):
     profile_id: UUID
     username: str
-    primary_photo_url: str | None
+    primary_photo_url: str | None = None
+
 
 class Chat(BaseModel):
     id: UUID = Field(default_factory=uuid.uuid4)
@@ -59,4 +62,12 @@ class Chat(BaseModel):
     participant_b: ChatParticipant
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
-    messages: list[Message]
+
+
+class ChatsListItem(BaseModel):
+    chat: Chat
+    last_message: Message | None = None
+
+
+class ChatsList(BaseModel):
+    chats: ChatsListItem | None = None
