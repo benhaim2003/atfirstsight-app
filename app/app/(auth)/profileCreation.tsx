@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Profile } from '@/src/types/profile';
 
-export default function ProfileCreationScreen() {
+export default function ProfileCreationScreen() {  
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Profile Creation Screen</Text>

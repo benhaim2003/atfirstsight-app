@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserState, UserAuthState, User } from '@/src/types/user'
+import { UserState, User } from '@/src/types/user'
 import { Profile } from '@/src/types/profile';
 
 export const useUserStore = create<UserState>()(
