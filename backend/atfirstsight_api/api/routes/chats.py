@@ -28,27 +28,33 @@ async def get_user_chat_list(
             status_code=500, detail=f"Failed to retrieve chat list., {e}"
         )
 
-class ChatCreateRequest(BaseModel):
-    user_ids: list[UUID]
-
-    @field_validator('user_ids')
-    @classmethod
-    def validate_users(cls, v):
-        if len(v) != 2:
-            raise ValueError('A chat must be between exactly 2 users.')
-        if len(set(v)) != len(v):
-            raise ValueError('User IDs must be unique.')
-        return v
-
 
 @router.post("/chats", response_model=str, tags=["Chat"],
              summary="Create a new chat")
 async def post_chat(
-        chat_request: ChatCreateRequest,
+        target_id: UUID,
         db: DBDep,
+        current_user: UserDep,
 ):
+    if target_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot create a chat with yourself."
+        )
+
+    approach_status = await db.approaches.check_approach_status(
+        user_a=current_user.id,
+        user_b=target_id,
+    )
+    if approach_status != 'verified':
+        raise HTTPException(
+            status_code=403,
+            detail="You cannot start a chat without a real meeting experience."
+        )
+
+    chat_participants = [current_user.id, target_id]
     try:
-        chat_id = await db.chats.post_chat(chat_request.user_ids)
+        chat_id = await db.chats.post_chat(chat_participants)
 
         return chat_id
 
