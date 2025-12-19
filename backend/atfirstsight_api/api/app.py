@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from atfirstsight_api.api.exception_handlers import add_exception_handlers
 from atfirstsight_api.api.lifespan import lifespan
-from atfirstsight_api.api.routes import chats, profiles
+from atfirstsight_api.api.routes import chats, profiles, users
 
 app = FastAPI(lifespan=lifespan)
 
@@ -23,5 +23,6 @@ app.add_middleware(
 
 app.include_router(chats.router)
 app.include_router(profiles.router)
+app.include_router(users.router)
 
 add_exception_handlers(app)
