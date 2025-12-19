@@ -5,31 +5,47 @@ import { UserState, User } from '@/src/types/user'
 import { Profile } from '@/src/types/profile';
 
 export const useUserStore = create<UserState>()(
-    (set) => ({
-        user: null, 
-        profile: null,
-        hasUser: false,
-        hasProfile: false,
-                    
-        setUser: (userData: User) => {
-            set({ 
-                user: userData, 
-                hasUser: true
-            });
-        },
-
-        setProfile: (profileData: Profile) => {
-            set({ 
-                profile: profileData, 
-                hasProfile: true 
-            });
-        },
-        
-        logout: () => set({ 
+    persist(
+        (set) => ({
             user: null, 
-            profile: null, 
+            profile: null,
             hasUser: false,
-            hasProfile: false
-        })
-    }),
+            hasProfile: false,
+                        
+            setUser: (userData: User) => {
+                set({ 
+                    user: userData, 
+                    hasUser: true
+                });
+            },
+
+            setProfile: (profileData: Profile) => {
+                set({ 
+                    profile: profileData, 
+                    hasProfile: true 
+                });
+            },
+
+            deleteUser: () => set({
+                user: null,
+                hasUser: false
+            }),
+            
+            deleteProfile: () => set({
+                profile: null,
+                hasProfile: false 
+            }),
+            
+            logout: () => set({
+                user: null,
+                profile: null,
+                hasUser: false,
+                hasProfile: false
+            })
+        }),
+        {
+            name: 'user-store',
+            storage: createJSONStorage(() => AsyncStorage),
+        }
+    )
 );

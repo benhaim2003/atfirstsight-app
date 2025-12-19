@@ -15,6 +15,8 @@ export interface UserState {
 
     setUser: (user: User) => void;    
     setProfile: (profile: Profile) => void;
+    deleteUser: () => void;
+    deleteProfile: () => void;
 
     logout: () => void;
 
