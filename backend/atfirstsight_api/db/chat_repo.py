@@ -11,7 +11,7 @@ class ChatsRepo:
     def __init__(self, connection: Connection) -> None:
         self._connection = connection
 
-    async def get_chats_by_user_id(self, user_id: UUID) -> list[Chat]:
+    async def get_chats_by_user_id(self, user_id: UUID) -> list[ChatsListItem]:
         chats_list_query = """
                            WITH user_chats AS (SELECT id      as chat_id,
                                                       CASE
@@ -48,6 +48,7 @@ class ChatsRepo:
                                               ON uc.profile_b_id = p.id
                                     LEFT JOIN latest_message lm
                                               ON uc.chat_id = lm.chat_id
+                                    --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
                                     LEFT JOIN public.profile_photo pp
                                               ON p.id = pp.profile_id
                            ORDER BY lm.created_at DESC NULLS LAST; \
@@ -119,9 +120,17 @@ class ChatsRepo:
 
     async def post_chat(self, users_ids: list[UUID]) -> str:
         post_chat_query = """
-                          INSERT INTO public.chats (profile_a_id, profile_b_id)
-                          VALUES ($1, $2)
-                          RETURNING id;
+                            WITH ins AS (
+                                INSERT INTO public.chats (profile_a_id, profile_b_id)
+                                VALUES ($1, $2)
+                                ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
+                                RETURNING id
+                            )
+                            SELECT id FROM ins
+                            UNION ALL
+                            SELECT id FROM public.chats
+                            WHERE profile_a_id = $1 AND profile_b_id = $2
+                            LIMIT 1;
                           """
 
         users_ids = sorted(users_ids)
