@@ -66,7 +66,7 @@ async def post_chat(
 
 
 @router.get("/chats/{chat_id}", response_model=Chat, tags=["Chat"],
-            summary="Get chat messages with pagination")
+            summary="Get specific chat details")
 async def get_chat(
     chat_id: UUID,
     db: DBDep,
