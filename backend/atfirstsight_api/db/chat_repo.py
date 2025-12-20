@@ -11,7 +11,6 @@ class ChatsRepo:
     def __init__(self, connection: Connection) -> None:
         self._connection = connection
 
-
     async def get_chats_by_user_id(self, user_id: UUID) -> list[ChatsListItem]:
         chats_list_query = """
                            WITH user_chats AS (SELECT id      as chat_id,
@@ -49,7 +48,7 @@ class ChatsRepo:
                                               ON uc.profile_b_id = p.id
                                     LEFT JOIN latest_message lm
                                               ON uc.chat_id = lm.chat_id
-                                    --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
+                               --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
                                     LEFT JOIN public.profile_photo pp
                                               ON p.id = pp.profile_id
                            ORDER BY lm.created_at DESC NULLS LAST; \
@@ -119,20 +118,22 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat list from db, {e}") from e
 
-
     async def post_chat(self, users_ids: list[UUID]) -> UUID:
         post_chat_query = """
-                            WITH ins AS (
-                                INSERT INTO public.chats (profile_a_id, profile_b_id)
-                                VALUES ($1, $2)
-                                ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
-                                RETURNING id
-                            )
-                            SELECT id FROM ins
-                            UNION ALL
-                            SELECT id FROM public.chats
-                            WHERE profile_a_id = $1 AND profile_b_id = $2
-                            LIMIT 1;
+                          WITH ins AS (
+                          INSERT
+                          INTO public.chats (profile_a_id, profile_b_id)
+                          VALUES ($1, $2)
+                          ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
+                              RETURNING id
+                              )
+                          SELECT id
+                          FROM ins
+                          UNION ALL
+                          SELECT id
+                          FROM public.chats
+                          WHERE profile_a_id = $1
+                            AND profile_b_id = $2 LIMIT 1;
                           """
 
         users_ids = sorted(users_ids)
@@ -145,22 +146,21 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
-
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat:
         get_chat_query = """
-                          SELECT c.id as chat_id
-                                ,c.created_at
-                                ,c.updated_at
-                                ,p.id as profile_id
-                                ,p.username
-                                ,pp.storage_path as primary_photo_url
-                          FROM public.chats c
-                          JOIN public.profiles p 
-                              ON p.id IN (c.profile_a_id, c.profile_b_id)
-                          --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
-                          LEFT JOIN profile_photos pp
-                              ON pp.profile_id = p.id
-                          WHERE c.id = $1
+                         SELECT c.id            as chat_id
+                              , c.created_at
+                              , c.updated_at
+                              , p.id            as profile_id
+                              , p.username
+                              , pp.storage_path as primary_photo_url
+                         FROM public.chats c
+                                  JOIN public.profiles p
+                                       ON p.id IN (c.profile_a_id, c.profile_b_id)
+                             --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
+                                  LEFT JOIN profile_photos pp
+                                            ON pp.profile_id = p.id
+                         WHERE c.id = $1
                          """
         try:
             rows = await self._connection.fetch(get_chat_query, chat_id)
@@ -182,6 +182,7 @@ class ChatsRepo:
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
                 else:
+                    # TODO: think what should happened if profile_b has been deleted (should the chat be deleted too?) should we add an "is active" to profiles to not delete them even if a profile got deleted?
                     participant_b = ChatParticipant(
                         profile_id=row_dict.get('profile_id'),
                         username=row_dict.get('username'),
@@ -191,7 +192,7 @@ class ChatsRepo:
             if not participant_a:
                 raise HTTPException(
                     status_code=403,
-                    detail="You cannot get a chat without being in it."
+                    detail="Access denied: You are not a participant in this chat."
                 )
             chat = Chat(
                 id=chat_id,
