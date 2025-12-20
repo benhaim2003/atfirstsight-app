@@ -1,5 +1,5 @@
 from uuid import UUID
-
+from fastapi import HTTPException
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
 
@@ -10,6 +10,7 @@ from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsL
 class ChatsRepo:
     def __init__(self, connection: Connection) -> None:
         self._connection = connection
+
 
     async def get_chats_by_user_id(self, user_id: UUID) -> list[ChatsListItem]:
         chats_list_query = """
@@ -118,7 +119,8 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat list from db, {e}") from e
 
-    async def post_chat(self, users_ids: list[UUID]) -> str:
+
+    async def post_chat(self, users_ids: list[UUID]) -> UUID:
         post_chat_query = """
                             WITH ins AS (
                                 INSERT INTO public.chats (profile_a_id, profile_b_id)
@@ -139,6 +141,67 @@ class ChatsRepo:
 
         try:
             chat_id = await self._connection.fetchval(post_chat_query, user_a_id, user_b_id)
-            return str(chat_id)
+            return chat_id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
+
+
+    async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat:
+        get_chat_query = """
+                          SELECT c.id as chat_id
+                                ,c.created_at
+                                ,c.updated_at
+                                ,p.id as profile_id
+                                ,p.username
+                                ,pp.storage_path as primary_photo_url
+                          FROM public.chats c
+                          JOIN public.profiles p 
+                              ON p.id IN (c.profile_a_id, c.profile_b_id)
+                          --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
+                          LEFT JOIN profile_photos pp
+                              ON pp.profile_id = p.id
+                          WHERE c.id = $1
+                         """
+        try:
+            rows = await self._connection.fetch(get_chat_query, chat_id)
+            if not rows:
+                raise HTTPException(status_code=404, detail="Chat not found")
+
+            participant_a = None
+            participant_b = None
+
+            chat_created_at = rows[0]['created_at']
+            chat_updated_at = rows[0]['updated_at']
+
+            for row in rows:
+                row_dict = dict(row)
+                if user_id == row_dict.get('profile_id'):
+                    participant_a = ChatParticipant(
+                        profile_id=row_dict.get('profile_id'),
+                        username=row_dict.get('username'),
+                        primary_photo_url=row_dict.get('primary_photo_url')
+                    )
+                else:
+                    participant_b = ChatParticipant(
+                        profile_id=row_dict.get('profile_id'),
+                        username=row_dict.get('username'),
+                        primary_photo_url=row_dict.get('primary_photo_url')
+                    )
+
+            if not participant_a:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You cannot get a chat without being in it."
+                )
+            chat = Chat(
+                id=chat_id,
+                participant_a=participant_a,
+                participant_b=participant_b,
+                created_at=chat_created_at,
+                updated_at=chat_updated_at
+            )
+
+            return chat
+
+        except PostgresError as e:
+            raise DBException(f"Failed getting chat from db, {e}") from e

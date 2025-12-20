@@ -4,7 +4,7 @@ from pydantic import field_validator, BaseModel
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException
-from atfirstsight_api.models.chats import ChatsList
+from atfirstsight_api.models.chats import ChatsList, Chat
 from uuid import UUID
 
 
@@ -29,7 +29,7 @@ async def get_user_chat_list(
         )
 
 
-@router.post("/chats", response_model=str, tags=["Chat"],
+@router.post("/chats", response_model=UUID, tags=["Chat"],
              summary="Create a new chat")
 async def post_chat(
         target_id: UUID,
@@ -62,4 +62,23 @@ async def post_chat(
         # Log the exception `e`
         raise HTTPException(
             status_code=500, detail=f"Failed to post chat., {e}"
+        )
+
+
+@router.get("/chats/{chat_id}", response_model=Chat, tags=["Chat"],
+            summary="Get chat messages with pagination")
+async def get_chat(
+    chat_id: UUID,
+    db: DBDep,
+    current_user: UserDep,
+):
+    try:
+        chat = await db.chats.get_chat(chat_id, current_user.id)
+
+        return chat
+
+    except DBException as e:
+        # Log the exception `e`
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get chat., {e}"
         )
