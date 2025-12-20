@@ -1,12 +1,11 @@
+from uuid import UUID
+
 from fastapi import HTTPException, APIRouter
-from pydantic import field_validator, BaseModel
 
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException
 from atfirstsight_api.models.chats import ChatsList, Chat
-from uuid import UUID
-
 
 router = APIRouter()
 
@@ -68,9 +67,9 @@ async def post_chat(
 @router.get("/chats/{chat_id}", response_model=Chat, tags=["Chat"],
             summary="Get specific chat details")
 async def get_chat(
-    chat_id: UUID,
-    db: DBDep,
-    current_user: UserDep,
+        chat_id: UUID,
+        db: DBDep,
+        current_user: UserDep,
 ):
     try:
         chat = await db.chats.get_chat(chat_id, current_user.id)
