@@ -26,7 +26,7 @@ export default function LogInScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View className='bg-blue-400' style={styles.container}>
       <Text style={styles.title}>Log In 🧭</Text>
       <Text>Email:</Text>
       <TextInput 
