@@ -5,7 +5,7 @@ import { UserState, User } from '@/src/types/user'
 import { Profile } from '@/src/types/profile';
 
 export const useUserStore = create<UserState>()(
-    persist(
+    //persist(
         (set) => ({
             user: null, 
             profile: null,
@@ -43,9 +43,9 @@ export const useUserStore = create<UserState>()(
                 hasProfile: false
             })
         }),
-        {
-            name: 'user-store',
-            storage: createJSONStorage(() => AsyncStorage),
-        }
-    )
+        // {
+        //     name: 'user-store',
+        //     storage: createJSONStorage(() => AsyncStorage),
+        // }
+    //)
 );
