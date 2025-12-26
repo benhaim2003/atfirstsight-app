@@ -10,8 +10,10 @@ export default function AuthLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        presentation: 'modal', 
-      }}
+        presentation: 'modal',
+        contentStyle: { backgroundColor: "#303133" },
+
+      }}      
     >
       <Stack.Protected guard={!hasUser}>
         <Stack.Screen name="signUp"/>
