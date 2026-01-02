@@ -204,3 +204,19 @@ class ChatsRepo:
 
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
+
+    async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
+        query = """
+                SELECT m.id,
+                       m.chat_id,
+                       m.sender_id,
+                       m.content,
+                       m.created_at,
+                       m.is_read
+                FROM public.messages m
+                INNER JOIN chat_participants cp ON m.id = cp.chat_id
+                WHERE m.chat_id = :chat_id
+                  AND cp.user_id = :user_id
+                ORDER BY m.created_at DESC LIMIT :limit
+                OFFSET :skip;
+                """
