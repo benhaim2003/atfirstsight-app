@@ -1,9 +1,9 @@
 from uuid import UUID
-from fastapi import HTTPException
+
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
 
-from atfirstsight_api.db.exceptions import (DBException)
+from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDenied)
 from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
 
@@ -165,7 +165,7 @@ class ChatsRepo:
         try:
             rows = await self._connection.fetch(get_chat_query, chat_id)
             if not rows:
-                raise HTTPException(status_code=404, detail="Chat not found")
+                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
 
             participant_a = None
             participant_b = None
@@ -190,10 +190,8 @@ class ChatsRepo:
                     )
 
             if not participant_a:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied: You are not a participant in this chat."
-                )
+                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+
             chat = Chat(
                 id=chat_id,
                 participant_a=participant_a,
