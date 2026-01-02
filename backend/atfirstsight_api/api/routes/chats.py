@@ -81,3 +81,33 @@ async def get_chat(
         raise HTTPException(
             status_code=500, detail=f"Failed to get chat., {e}"
         )
+
+
+@router.get("/chats/{chat_id}/messages", response_model=list[Message], tags=["Chat"],
+            summary="Get specific chat messages")
+async def get_chat_messages(
+        chat_id: UUID,
+        db: DBDep,
+        current_user: UserDep,
+        limit: int = Query(50, le=100),  # Default 50, max 100 per request
+        skip: int = 0
+):
+    try:
+        messages = await db.chats.get_chat_messages(
+            chat_id=chat_id,
+            user_id=current_user.id,
+            limit=limit,
+            skip=skip
+        )
+
+        return messages
+
+
+    except ItemNotFoundException:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    except AccessDenied:
+        raise HTTPException(status_code=403, detail="You are not authorized to view this chat.")
+
+    except DBException as e:
+        raise HTTPException(status_code=500, detail="Internal Server Error")
