@@ -1,11 +1,11 @@
 from uuid import UUID
 
-from fastapi import HTTPException, APIRouter
+from fastapi import HTTPException, APIRouter, Query
 
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
-from atfirstsight_api.db.exceptions import DBException
-from atfirstsight_api.models.chats import ChatsList, Chat
+from atfirstsight_api.db.exceptions import DBException, AccessDenied, ItemNotFoundException
+from atfirstsight_api.models.chats import ChatsList, Chat, Message
 
 router = APIRouter()
 
