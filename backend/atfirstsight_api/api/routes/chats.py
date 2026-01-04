@@ -25,7 +25,8 @@ async def get_user_chat_list(
     except DBException as e:
         # TODO add logs in all Exceptions
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve chat list., {e}"
+            status_code=500,
+            detail=f"Failed to retrieve chat list., {e}"
         )
 
 
@@ -60,7 +61,8 @@ async def post_chat(
 
     except DBException as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to post chat., {e}"
+            status_code=500,
+            detail=f"Failed to post chat., {e}"
         )
 
 
@@ -77,13 +79,20 @@ async def get_chat(
 
 
     except ItemNotFoundException:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found")
 
     except AccessDenied:
-        raise HTTPException(status_code=403, detail="You are not authorized to view this chat.")
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to view this chat.")
 
     except DBException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get chat massages., {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get chat massages., {e}"
+        )
 
 
 @router.get("/chats/{chat_id}/messages", response_model=list[Message], tags=["Chat"],
@@ -107,13 +116,22 @@ async def get_chat_messages(
 
 
     except ItemNotFoundException:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found"
+        )
 
     except AccessDenied:
-        raise HTTPException(status_code=403, detail="You are not authorized to view this chat.")
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to view this chat."
+        )
 
     except DBException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get chat massages., {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get chat massages., {e}"
+        )
 
 
 @router.post("/chats/{chat_id}/messages", response_model=UUID, tags=["Chat"],

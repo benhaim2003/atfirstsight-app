@@ -244,7 +244,14 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
+
     async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageSchema) -> UUID:
+        check_query = """
+                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
+                             EXISTS(SELECT 1 \
+                                    FROM public.chats \
+                                    WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant \
+                      """
         post_chat_massage_query = """
                                     INSERT INTO public.messages (
                                         id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
@@ -266,6 +273,12 @@ class ChatsRepo:
         message_obj = TypeAdapter(Message).validate_python(full_message_data)
 
         try:
+            row = await self._connection.fetchrow(check_query, chat_id, user_id)
+            if not row['chat_exists']:
+                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
+            if not row['is_participant']:
+                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+
             await self._connection.fetchval(post_chat_massage_query, message_obj.id, message_obj.chat_id,
                                                       message_obj.sender_id, message_obj.content,
                                                       message_obj.msg_type, message_obj.metadata,
