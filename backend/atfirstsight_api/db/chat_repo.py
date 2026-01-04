@@ -1,8 +1,12 @@
+import uuid
+from datetime import datetime
 from uuid import UUID
 
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
+from pydantic import TypeAdapter
 
+from atfirstsight_api.api.api_models.chats import CreateMessageSchema
 from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDenied)
 from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
@@ -207,17 +211,65 @@ class ChatsRepo:
 
 
     async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
+        check_query = """
+                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1) as chat_exists,
+                             EXISTS(SELECT 1 FROM public.chats WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
+                      """
         query = """
-                SELECT m.id,
-                       m.chat_id,
-                       m.sender_id,
-                       m.content,
-                       m.created_at,
-                       m.is_read
-                FROM public.messages m
-                INNER JOIN chat_participants cp ON m.id = cp.chat_id
-                WHERE m.chat_id = :chat_id
-                  AND cp.user_id = :user_id
-                ORDER BY m.created_at DESC LIMIT :limit
-                OFFSET :skip;
+                SELECT id, \
+                       chat_id, \
+                       sender_id, \
+                       content, \
+                       msg_type, \
+                       metadata, \
+                       created_at, \
+                       read_at
+                FROM public.messages
+                WHERE chat_id = $1
+                ORDER BY created_at DESC
+                    LIMIT $2 \
+                OFFSET $3; \
                 """
+        try:
+            row = await self._connection.fetchrow(check_query, chat_id, user_id)
+
+            if not row['chat_exists']:
+                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
+            if not row['is_participant']:
+                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+
+            rows = await self._connection.fetch(query, chat_id, limit, skip)
+            return TypeAdapter(list[Message]).validate_python([dict(r) for r in rows])
+
+        except PostgresError as e:
+            raise DBException(f"Failed getting chat from db, {e}") from e
+
+    async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageSchema) -> UUID:
+        post_chat_massage_query = """
+                                    INSERT INTO public.messages (
+                                        id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
+                                    )
+                                    VALUES (
+                                        $1, $2, $3, $4, $5, $6, $7, $8
+                                    )
+                                    RETURNING id;
+                                """
+
+        full_message_data = message_payload.model_dump()
+        full_message_data.update({
+            "id": uuid.uuid4(),
+            "chat_id": chat_id,
+            "sender_id": user_id,
+            "created_at": datetime.now(),
+            "read_at": None
+        })
+        message_obj = TypeAdapter(Message).validate_python(full_message_data)
+
+        try:
+            await self._connection.fetchval(post_chat_massage_query, message_obj.id, message_obj.chat_id,
+                                                      message_obj.sender_id, message_obj.content,
+                                                      message_obj.msg_type, message_obj.metadata,
+                                                      message_obj.created_at, message_obj.read_at)
+            return message_obj.id
+        except PostgresError as e:
+            raise DBException(f"Failed creating chat in db, {e}") from e

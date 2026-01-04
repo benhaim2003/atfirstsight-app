@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, APIRouter, Query
 
+from atfirstsight_api.api.api_models.chats import CreateMessageSchema  # Import the model above
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException, AccessDenied, ItemNotFoundException
@@ -22,7 +23,7 @@ async def get_user_chat_list(
         return ChatsList(chats=chat_previews)
 
     except DBException as e:
-        # Log the exception `e`
+        # TODO add logs in all Exceptions
         raise HTTPException(
             status_code=500, detail=f"Failed to retrieve chat list., {e}"
         )
@@ -58,7 +59,6 @@ async def post_chat(
         return chat_id
 
     except DBException as e:
-        # Log the exception `e`
         raise HTTPException(
             status_code=500, detail=f"Failed to post chat., {e}"
         )
@@ -92,7 +92,7 @@ async def get_chat_messages(
         chat_id: UUID,
         db: DBDep,
         current_user: UserDep,
-        limit: int = Query(50, le=100),  # Default 50, max 100 per request
+        limit: int = Query(50, le=100),
         skip: int = 0
 ):
     try:
@@ -113,4 +113,40 @@ async def get_chat_messages(
         raise HTTPException(status_code=403, detail="You are not authorized to view this chat.")
 
     except DBException as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=f"Failed to get chat massages., {e}")
+
+
+@router.post("/chats/{chat_id}/messages", response_model=UUID, tags=["Chat"],
+             summary="Post a message to a chat")
+async def post_chat_message(
+        chat_id: UUID,
+        message_data: CreateMessageSchema,
+        db: DBDep,
+        current_user: UserDep,
+):
+    try:
+        result = await db.chats.post_chat_messages(
+            chat_id=chat_id,
+            sender_id=current_user.id,
+            message_payload=message_data
+        )
+
+        return result
+
+    except ItemNotFoundException:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found."
+        )
+
+    except AccessDenied:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to send messages in this chat."
+        )
+
+    except DBException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send message., {e}"
+        )
