@@ -73,14 +73,17 @@ async def get_chat(
 ):
     try:
         chat = await db.chats.get_chat(chat_id, current_user.id)
-
         return chat
 
+
+    except ItemNotFoundException:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    except AccessDenied:
+        raise HTTPException(status_code=403, detail="You are not authorized to view this chat.")
+
     except DBException as e:
-        # Log the exception `e`
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get chat., {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get chat massages., {e}")
 
 
 @router.get("/chats/{chat_id}/messages", response_model=list[Message], tags=["Chat"],

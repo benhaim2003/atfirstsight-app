@@ -146,7 +146,7 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
-    async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat:
+    async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat | None:
         get_chat_query = """
                          SELECT c.id            as chat_id
                               , c.created_at
@@ -204,6 +204,7 @@ class ChatsRepo:
 
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
+
 
     async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
         query = """
