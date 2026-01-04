@@ -36,6 +36,23 @@ class ProfilesRepo:
         except PostgresError as e:
             raise DBException("Failed getting profile from db") from e
 
+    async def get_profile_photo(self, profile_photo_id: UUID) -> ProfilePhoto:
+        try:
+            profile_photo_row = await self._connection.fetchrow(
+                """
+                SELECT * FROM public.profile_photos
+                WHERE id = $1
+                """,
+                profile_photo_id
+            )
+            if not profile_photo_row:
+                raise ItemNotFoundException(f"Profile photo with id: '{profile_photo_id}' not found")
+
+            return ProfilePhoto.model_validate(dict(profile_photo_row))
+
+        except PostgresError as e:
+            raise DBException("Failed getting profile photo from db") from e
+
     async def insert_profile(self, profile: Profile) -> None:
         try:
             await self._connection.execute(
@@ -77,3 +94,15 @@ class ProfilesRepo:
             raise DuplicateItemException(f"duplicate profile photo id: '{profile_photo.id}'") from e
         except PostgresError as e:
             raise DBException("Failed inserting profile photo to db") from e
+
+    async def delete_profile_photo(self, profile_photo_id: UUID) -> None:
+        try:
+            await self._connection.execute(
+                """
+                DELETE FROM public.profile_photos
+                WHERE id = $1
+                """,
+                profile_photo_id
+            )
+        except PostgresError as e:
+            raise DBException("Failed deleting profile photo to db") from e
