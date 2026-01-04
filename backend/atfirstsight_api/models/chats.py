@@ -1,31 +1,73 @@
-from pydantic import BaseModel
-from uuid import UUID
+import uuid
 from datetime import datetime
-from typing import Optional
-from .chat import ChatParticipant
-
-class LastMessage(BaseModel):
-    """A model for the last message preview in a chat list."""
-    content: str
-    created_at: datetime
-    sender_id: UUID
-
-    model_config = { "from_attributes": True }
+from uuid import UUID
+from enum import Enum
+from typing import Literal, Union
+from pydantic import BaseModel, Field
 
 
-class ChatPreview(BaseModel):
-    """
-    The main model for a single item in the chat list.
-    Contains the chat ID, the *other* person, and the last message.
-    """
+class MessageType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    AUDIO = "audio"
+
+
+class ImageMetaData(BaseModel):
+    width: int
+    height: int
+    aspect_ratio: str
+
+
+class AudioMetaData(BaseModel):
+    duration_seconds: float
+    waveform: list[float]
+
+
+class MessageBase(BaseModel):
+    id: UUID = Field(default_factory=uuid.uuid4)
     chat_id: UUID
-    other_participant: ChatParticipant  # We reuse the model from get_chat_session
-    last_message: Optional[LastMessage] = None
-    unread_count: int = 0  # We can implement this logic later
+    sender_id: UUID
+    content: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    read_at: datetime | None = None
 
-    model_config = { "from_attributes": True }
+
+class TextMessage(MessageBase):
+    msg_type: Literal[MessageType.TEXT] = MessageType.TEXT
+    metadata: None = None
 
 
-class ChatListResponse(BaseModel):
-    """The final response object the API will send."""
-    chats: list[ChatPreview]
+class ImageMessage(MessageBase):
+    msg_type: Literal[MessageType.IMAGE] = MessageType.IMAGE
+    metadata: ImageMetaData
+
+
+class AudioMessage(MessageBase):
+    msg_type: Literal[MessageType.AUDIO] = MessageType.AUDIO
+    metadata: AudioMetaData
+
+
+Message = Union[TextMessage, ImageMessage, AudioMessage]
+
+
+class ChatParticipant(BaseModel):
+    profile_id: UUID
+    username: str
+    primary_photo_url: str | None = None
+
+
+class Chat(BaseModel):
+    id: UUID = Field(default_factory=uuid.uuid4)
+    participant_a: ChatParticipant
+    participant_b: ChatParticipant
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class ChatsListItem(BaseModel):
+    chat: Chat
+    last_message: Message | None = None
+
+
+class ChatsList(BaseModel):
+    chats: ChatsListItem | None = None
