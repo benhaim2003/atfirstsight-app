@@ -1,170 +1,136 @@
-from uuid import UUID
+import uuid
 
-from fastapi import HTTPException, APIRouter, Query
+from fastapi import HTTPException, status, APIRouter
 
-from atfirstsight_api.api.api_models.chats import CreateMessageSchema  # Import the model above
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
-from atfirstsight_api.db.exceptions import DBException, AccessDenied, ItemNotFoundException
-from atfirstsight_api.models.chats import ChatsList, Chat, Message
+from atfirstsight_api.api.dependencies.storage import StorageDep
+from atfirstsight_api.db.exceptions import DBException
+from atfirstsight_api.models.chat import ChatSession, ChatParticipant, Message, MessageCreate
+from atfirstsight_api.models.chats import ChatListResponse
 
 router = APIRouter()
 
 
-@router.get("/chats", response_model=ChatsList, tags=["Chat"],
-            summary="Retrieve a list of the user's chats")
+@router.get("/chat_session/{chat_id}", response_model=ChatSession, tags=["Chat"])
+async def get_chat_session(
+        chat_id: uuid.UUID,
+        user: UserDep,
+        db: DBDep,
+        storage: StorageDep
+) -> ChatSession:
+    chat = await db.chats.get_chat_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if user.id not in (chat.profile_a_id, chat.profile_b_id):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    other_participant_id = (
+        chat.profile_b_id
+        if user.id == chat.profile_a_id
+        else chat.profile_a_id
+    )
+
+    other_profile = await db.profiles.get_profile(other_participant_id)
+    if not other_profile:
+        raise HTTPException(status_code=404, detail="Participant profile not found")
+
+    messages = await db.chats.get_messages_by_chat_id(chat_id, limit=50)
+
+    # 6. Build the other participant's photo URL
+    # primary_photo_url = None
+    # if other_profile.photos:
+    #     # Find the photo with sort_order 1, or fall back to the first photo
+    #     primary_photo = next((p for p in other_profile.photos if p.sort_order == 1), None)
+    #     if not primary_photo:
+    #         primary_photo = other_profile.photos[0] # Fallback to first
+
+    #     if primary_photo:
+    #         # Assumes your storage dep can create a public URL
+    #         primary_photo_url = await storage.get_public_url(
+    #             PROFILE_PHOTOS_BUCKET, 
+    #             primary_photo.storage_path
+    #         )
+
+    # 7. Assemble the response model
+    other_participant = ChatParticipant(
+        profile_id=other_profile.id,
+        username=other_profile.username,
+        # primary_photo_url=primary_photo_url
+    )
+
+    return ChatSession(
+        chat_id=chat.id,
+        other_participant=other_participant,
+        messages=messages
+    )
+
+
+@router.get("/chats/", response_model=ChatListResponse, tags=["Chat"],
+            summary="Get all chat sessions for the current user",
+            )
 async def get_user_chat_list(
         db: DBDep,
-        current_user: UserDep,
+        current_user: UserDep,  # Get user from auth
 ):
+    """
+    Fetches a list of all active chat sessions for the authenticated user.
+
+    Each chat preview includes:
+    - The other participant's details (username, photo)
+    - The last message sent in the chat
+    """
     try:
+        # We use the authenticated user's ID
         chat_previews = await db.chats.get_chats_by_user_id(current_user.id)
 
-        return ChatsList(chats=chat_previews)
+        return ChatListResponse(chats=chat_previews)
 
     except DBException as e:
-        # TODO add logs in all Exceptions
+        # Log the exception `e`
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve chat list., {e}"
+            status_code=500, detail=f"Failed to retrieve chat list., {e}"
         )
 
 
-@router.post("/chats", response_model=UUID, tags=["Chat"],
-             summary="Create a new chat")
-async def post_chat(
-        target_id: UUID,
+@router.post(
+    "/chats/{chat_id}/messages",
+    response_model=Message,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Chat"],
+    summary="Send a message to a chat",
+)
+async def send_message(
+        chat_id: uuid.UUID,
+        message_in: MessageCreate,  # Assuming you added this to your api_models
         db: DBDep,
         current_user: UserDep,
 ):
-    if target_id == current_user.id:
+    chat = await db.chats.get_chat_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if current_user.id not in (chat.profile_a_id, chat.profile_b_id):
         raise HTTPException(
-            status_code=400,
-            detail="You cannot create a chat with yourself."
+            status_code=403,
+            detail="You are not a participant in this chat"
         )
 
-    approach_status = await db.approaches.check_approach_status(
-        user_a=current_user.id,
-        user_b=target_id,
+    # 2. Build the full Message object
+    message_to_db = Message(
+        chat_id=chat_id,
+        sender_id=current_user.id,
+        content=message_in.content
     )
-    if approach_status != 'verified':
-        raise HTTPException(
-            status_code=403,
-            detail="You cannot start a chat without a real meeting experience."
-        )
 
-    chat_participants = [current_user.id, target_id]
     try:
-        chat_id = await db.chats.post_chat(chat_participants)
+        # 3. Call your (now modified) repo method
+        new_message = await db.chats.insert_message(message_to_db)
 
-        return chat_id
+        # 4. Return the new message
+        return new_message
 
     except DBException as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to post chat., {e}"
-        )
-
-
-@router.get("/chats/{chat_id}", response_model=Chat, tags=["Chat"],
-            summary="Get specific chat details")
-async def get_chat(
-        chat_id: UUID,
-        db: DBDep,
-        current_user: UserDep,
-):
-    try:
-        chat = await db.chats.get_chat(chat_id, current_user.id)
-        return chat
-
-
-    except ItemNotFoundException:
-        raise HTTPException(
-            status_code=404,
-            detail="Chat not found")
-
-    except AccessDenied:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not authorized to view this chat.")
-
-    except DBException as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get chat massages., {e}"
-        )
-
-
-@router.get("/chats/{chat_id}/messages", response_model=list[Message], tags=["Chat"],
-            summary="Get specific chat messages")
-async def get_chat_messages(
-        chat_id: UUID,
-        db: DBDep,
-        current_user: UserDep,
-        limit: int = Query(50, le=100),
-        skip: int = 0
-):
-    try:
-        messages = await db.chats.get_chat_messages(
-            chat_id=chat_id,
-            user_id=current_user.id,
-            limit=limit,
-            skip=skip
-        )
-
-        return messages
-
-
-    except ItemNotFoundException:
-        raise HTTPException(
-            status_code=404,
-            detail="Chat not found"
-        )
-
-    except AccessDenied:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not authorized to view this chat."
-        )
-
-    except DBException as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get chat massages., {e}"
-        )
-
-
-@router.post("/chats/{chat_id}/messages", response_model=UUID, tags=["Chat"],
-             summary="Post a message to a chat")
-async def post_chat_message(
-        chat_id: UUID,
-        message_data: CreateMessageSchema,
-        db: DBDep,
-        current_user: UserDep,
-):
-    try:
-        result = await db.chats.post_chat_messages(
-            chat_id=chat_id,
-            sender_id=current_user.id,
-            message_payload=message_data
-        )
-
-        return result
-
-    except ItemNotFoundException:
-        raise HTTPException(
-            status_code=404,
-            detail="Chat not found."
-        )
-
-    except AccessDenied:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not authorized to send messages in this chat."
-        )
-
-    except DBException as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send message., {e}"
+            status_code=500, detail="Failed to send message."
         )

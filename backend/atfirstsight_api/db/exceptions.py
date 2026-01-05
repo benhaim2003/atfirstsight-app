@@ -8,7 +8,3 @@ class ItemNotFoundException(DBException):
 
 class DuplicateItemException(DBException):
     pass
-
-
-class AccessDenied(DBException):
-    pass
