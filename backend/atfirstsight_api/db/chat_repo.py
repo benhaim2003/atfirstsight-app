@@ -239,7 +239,7 @@ class ChatsRepo:
                 raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             rows = await self._connection.fetch(query, chat_id, limit, skip)
-            return TypeAdapter(list[Message]).validate_python([dict(r) for r in rows])
+            return [Message.model_validate(dict(r)) for r in rows]
 
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
