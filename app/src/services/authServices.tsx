@@ -1,21 +1,55 @@
+import axios from "axios";
 import { User } from "@/src/types/user";
 
-export function logIn(email: string, password: string): User | null {
-    console.log("Log In with email:", email, "password:", password)
-    // Get user from server
+const API_BASE_URL = "http://192.168.2.104:8080";
 
-    // return user or null if not exist
-    return null
+
+export async function logIn(email: string, password: string): Promise<User | null> {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/users/signin`, {
+            email,
+            password
+        });
+        
+        const { id, email: userEmail } = response.data;
+        
+        console.log("LOGIN to ", email)
+
+        const user: User = {
+            id,
+            email: userEmail,
+            created_at: new Date()
+        };
+        
+        return user;
+    } 
+    catch (error) {
+        console.error("Sign in failed:", error);
+        return null;
+    }
 }
 
-export function signUp(email: string, password: string): User {
-    console.log("Sign Up with email:", email, "password:", password)
-    
-    const user: User = {
-        id: Math.random().toString(36).substring(7),
-        email,
-        created_at: new Date()
-    };
+export async function signUp(email: string, password: string): Promise<User | null> {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/users/signup`, {
+            email,
+            password
+        });
+        
+        const { id, email: userEmail } = response.data;
+        
+        console.log("SIGNUP for ", email)
 
-    return user
+        const user: User = {
+            id,
+            email: userEmail,
+            created_at: new Date()
+        };
+        
+        return user;
+    } 
+    catch (error) {
+        console.error("Sign up failed:", error);
+        return null;
+    }
 }
