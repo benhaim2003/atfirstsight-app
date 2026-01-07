@@ -245,7 +245,7 @@ class ChatsRepo:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
 
-    async def insert_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageRequest) -> UUID:
+    async def insert_chat_messages(self, message_payload: Message) -> UUID:
         check_query = """
                       SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
                              EXISTS(SELECT 1 \
@@ -261,28 +261,17 @@ class ChatsRepo:
                                     )
                                     RETURNING id;
                                 """
-
-        full_message_data = message_payload.model_dump()
-        full_message_data.update({
-            "id": uuid.uuid4(),
-            "chat_id": chat_id,
-            "sender_id": user_id,
-            "created_at": datetime.now(),
-            "read_at": None
-        })
-        message_obj = TypeAdapter(Message).validate_python(full_message_data)
-
         try:
-            row = await self._connection.fetchrow(check_query, chat_id, user_id)
+            row = await self._connection.fetchrow(check_query, message_payload.chat_id, message_payload.sender_id)
             if not row['chat_exists']:
-                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
+                raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
             if not row['is_participant']:
-                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
+                raise AccessDeniedException(f"User {message_payload.sender_id} is not a participant in chat {message_payload.sender_id}.")
 
-            await self._connection.fetchval(insert_chat_massage_query, message_obj.id, message_obj.chat_id,
-                                                      message_obj.sender_id, message_obj.content,
-                                                      message_obj.msg_type, message_obj.metadata,
-                                                      message_obj.created_at, message_obj.read_at)
-            return message_obj.id
+            await self._connection.fetchval(insert_chat_massage_query, message_payload.id, message_payload.chat_id,
+                                                      message_payload.sender_id, message_payload.content,
+                                                      message_payload.msg_type, message_payload.metadata,
+                                                      message_payload.created_at, message_payload.read_at)
+            return message_payload.id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e

@@ -1,3 +1,5 @@
+import uuid
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import HTTPException, APIRouter, Query, Depends
@@ -91,10 +93,15 @@ async def upload_chat_message(
         db: DBDep,
         current_user: UserDep,
 ) -> UUID:
-    result = await db.chats.insert_chat_messages(
+    whole_message_data = Message(
+        id=uuid.uuid4(),
         chat_id=chat_id,
         sender_id=current_user.id,
-        message_payload=message_data
+        created_at=datetime.now(),
+        read_at=None,
+        **message_data.model_dump(exclude_none=True))
+    result = await db.chats.insert_chat_messages(
+        whole_message_data
     )
 
     return result
