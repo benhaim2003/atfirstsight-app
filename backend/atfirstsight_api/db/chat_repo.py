@@ -7,7 +7,7 @@ from asyncpg.exceptions import PostgresError
 from pydantic import TypeAdapter
 
 from atfirstsight_api.api.api_models.chats import CreateMessageRequest
-from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDenied)
+from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDeniedException)
 from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
 
@@ -194,7 +194,7 @@ class ChatsRepo:
                     )
 
             if not participant_a:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             chat = Chat(
                 id=chat_id,
@@ -236,7 +236,7 @@ class ChatsRepo:
             if not row['chat_exists']:
                 raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
             if not row['is_participant']:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             rows = await self._connection.fetch(query, chat_id, limit, skip)
             return TypeAdapter(list[Message]).validate_python([dict(r) for r in rows])
@@ -277,7 +277,7 @@ class ChatsRepo:
             if not row['chat_exists']:
                 raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
             if not row['is_participant']:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
+                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             await self._connection.fetchval(post_chat_massage_query, message_obj.id, message_obj.chat_id,
                                                       message_obj.sender_id, message_obj.content,

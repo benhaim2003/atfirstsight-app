@@ -10,5 +10,5 @@ class DuplicateItemException(DBException):
     pass
 
 
-class AccessDenied(DBException):
+class AccessDeniedException(DBException):
     pass
