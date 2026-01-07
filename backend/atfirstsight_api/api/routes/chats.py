@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, APIRouter, Query
 
-from atfirstsight_api.api.api_models.chats import CreateMessageSchema  # Import the model above
+from atfirstsight_api.api.api_models.chats import CreateMessageRequest  # Import the model above
 from atfirstsight_api.api.dependencies.auth import UserDep
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException, AccessDenied, ItemNotFoundException
@@ -138,7 +138,7 @@ async def get_chat_messages(
              summary="Post a message to a chat")
 async def post_chat_message(
         chat_id: UUID,
-        message_data: CreateMessageSchema,
+        message_data: CreateMessageRequest,
         db: DBDep,
         current_user: UserDep,
 ):

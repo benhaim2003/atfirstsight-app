@@ -28,4 +28,4 @@ class CreateAudioMessageRequest(BaseModel):
     metadata: AudioMetaData
 
 
-CreateMessageSchema = Union[CreateTextMessageRequest, CreateImageMessageRequest, CreateAudioMessageRequest]
+CreateMessageRequest = Union[CreateTextMessageRequest, CreateImageMessageRequest, CreateAudioMessageRequest]

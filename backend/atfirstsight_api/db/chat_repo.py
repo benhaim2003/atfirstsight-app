@@ -6,7 +6,7 @@ from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
 from pydantic import TypeAdapter
 
-from atfirstsight_api.api.api_models.chats import CreateMessageSchema
+from atfirstsight_api.api.api_models.chats import CreateMessageRequest
 from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDenied)
 from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
@@ -245,7 +245,7 @@ class ChatsRepo:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
 
-    async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageSchema) -> UUID:
+    async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageRequest) -> UUID:
         check_query = """
                       SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
                              EXISTS(SELECT 1 \
