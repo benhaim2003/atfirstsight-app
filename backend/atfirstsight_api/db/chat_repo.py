@@ -122,8 +122,8 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat list from db, {e}") from e
 
-    async def post_chat(self, users_ids: list[UUID]) -> UUID:
-        post_chat_query = """
+    async def insert_chat(self, users_ids: list[UUID]) -> UUID:
+        insert_chat_query = """
                           WITH ins AS (
                           INSERT
                           INTO public.chats (profile_a_id, profile_b_id)
@@ -145,7 +145,7 @@ class ChatsRepo:
         user_b_id = users_ids[1]
 
         try:
-            chat_id = await self._connection.fetchval(post_chat_query, user_a_id, user_b_id)
+            chat_id = await self._connection.fetchval(insert_chat_query, user_a_id, user_b_id)
             return chat_id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
@@ -245,14 +245,14 @@ class ChatsRepo:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
 
-    async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageRequest) -> UUID:
+    async def insert_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageRequest) -> UUID:
         check_query = """
                       SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
                              EXISTS(SELECT 1 \
                                     FROM public.chats \
                                     WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant \
                       """
-        post_chat_massage_query = """
+        insert_chat_massage_query = """
                                     INSERT INTO public.messages (
                                         id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
                                     )
@@ -279,7 +279,7 @@ class ChatsRepo:
             if not row['is_participant']:
                 raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
-            await self._connection.fetchval(post_chat_massage_query, message_obj.id, message_obj.chat_id,
+            await self._connection.fetchval(insert_chat_massage_query, message_obj.id, message_obj.chat_id,
                                                       message_obj.sender_id, message_obj.content,
                                                       message_obj.msg_type, message_obj.metadata,
                                                       message_obj.created_at, message_obj.read_at)

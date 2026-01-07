@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, APIRouter, Query, Depends
 
-from atfirstsight_api.api.api_models.chats import CreateMessageRequest  # Import the model above
+from atfirstsight_api.api.api_models.chats import CreateMessageRequest
 from atfirstsight_api.api.dependencies.auth import UserDep, get_user
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException
@@ -30,7 +30,7 @@ async def get_user_chat_list(
 
 
 @router.post("", summary="Create a new chat")
-async def post_chat(
+async def upload_chat(
         target_id: UUID,
         db: DBDep,
         current_user: UserDep,
@@ -52,7 +52,7 @@ async def post_chat(
         )
 
     chat_participants = [current_user.id, target_id]
-    chat_id = await db.chats.post_chat(chat_participants)
+    chat_id = await db.chats.insert_chat(chat_participants)
     return chat_id
 
 
@@ -85,13 +85,13 @@ async def get_chat_messages(
 
 
 @router.post("/{chat_id}/messages", summary="Post a message to a chat")
-async def post_chat_message(
+async def upload_chat_message(
         chat_id: UUID,
         message_data: CreateMessageRequest,
         db: DBDep,
         current_user: UserDep,
 ) -> UUID:
-    result = await db.chats.post_chat_messages(
+    result = await db.chats.insert_chat_messages(
         chat_id=chat_id,
         sender_id=current_user.id,
         message_payload=message_data
