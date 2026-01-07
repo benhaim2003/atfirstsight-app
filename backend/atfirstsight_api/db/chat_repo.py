@@ -164,10 +164,10 @@ class ChatsRepo:
                              --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
                                   LEFT JOIN profile_photos pp
                                             ON pp.profile_id = p.id
-                         WHERE c.id = $1
+                         WHERE c.id = $1 and (c.profile_a_id = $2 or c.profile_b_id = $2)
                          """
         try:
-            rows = await self._connection.fetch(get_chat_query, chat_id)
+            rows = await self._connection.fetch(get_chat_query, chat_id, user_id)
             if not rows:
                 raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
 
@@ -192,9 +192,6 @@ class ChatsRepo:
                         username=row_dict['username'],
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
-
-            if not participant_a:
-                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             chat = Chat(
                 id=chat_id,
