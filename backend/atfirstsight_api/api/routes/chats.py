@@ -1,22 +1,21 @@
 from uuid import UUID
 
-from fastapi import HTTPException, APIRouter, Query
+from fastapi import HTTPException, APIRouter, Query, Depends
 
 from atfirstsight_api.api.api_models.chats import CreateMessageRequest  # Import the model above
-from atfirstsight_api.api.dependencies.auth import UserDep
+from atfirstsight_api.api.dependencies.auth import UserDep, get_user
 from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.db.exceptions import DBException, AccessDenied, ItemNotFoundException
 from atfirstsight_api.models.chats import ChatsList, Chat, Message
 
-router = APIRouter()
+router = APIRouter(prefix="/chats", tags=["chats"], dependencies=[Depends(get_user)])
 
 
-@router.get("/chats", response_model=ChatsList, tags=["Chat"],
-            summary="Retrieve a list of the user's chats")
+@router.get("", summary="Retrieve a list of the user's chats")
 async def get_user_chat_list(
         db: DBDep,
         current_user: UserDep,
-):
+) -> ChatsList:
     try:
         chat_previews = await db.chats.get_chats_by_user_id(current_user.id)
 
@@ -30,13 +29,12 @@ async def get_user_chat_list(
         )
 
 
-@router.post("/chats", response_model=UUID, tags=["Chat"],
-             summary="Create a new chat")
+@router.post("", summary="Create a new chat")
 async def post_chat(
         target_id: UUID,
         db: DBDep,
         current_user: UserDep,
-):
+) -> UUID:
     if target_id == current_user.id:
         raise HTTPException(
             status_code=400,
@@ -66,13 +64,12 @@ async def post_chat(
         )
 
 
-@router.get("/chats/{chat_id}", response_model=Chat, tags=["Chat"],
-            summary="Get specific chat details")
+@router.get("/{chat_id}", summary="Get specific chat details")
 async def get_chat(
         chat_id: UUID,
         db: DBDep,
         current_user: UserDep,
-):
+) -> Chat:
     try:
         chat = await db.chats.get_chat(chat_id, current_user.id)
         return chat
@@ -95,15 +92,14 @@ async def get_chat(
         )
 
 
-@router.get("/chats/{chat_id}/messages", response_model=list[Message], tags=["Chat"],
-            summary="Get specific chat messages")
+@router.get("/{chat_id}/messages", summary="Get specific chat messages")
 async def get_chat_messages(
         chat_id: UUID,
         db: DBDep,
         current_user: UserDep,
         limit: int = Query(50, le=100),
         skip: int = 0
-):
+) -> list[Message]:
     try:
         messages = await db.chats.get_chat_messages(
             chat_id=chat_id,
@@ -134,14 +130,13 @@ async def get_chat_messages(
         )
 
 
-@router.post("/chats/{chat_id}/messages", response_model=UUID, tags=["Chat"],
-             summary="Post a message to a chat")
+@router.post("/{chat_id}/messages", summary="Post a message to a chat")
 async def post_chat_message(
         chat_id: UUID,
         message_data: CreateMessageRequest,
         db: DBDep,
         current_user: UserDep,
-):
+) -> UUID:
     try:
         result = await db.chats.post_chat_messages(
             chat_id=chat_id,
