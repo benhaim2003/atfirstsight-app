@@ -8,7 +8,6 @@ from backend.atfirstsight_api.models.chats import MessageType, AudioMetaData, Im
 
 class MarkReadRequest(BaseModel):
     chat_id: UUID
-    last_read_message_id: UUID
 
 
 class CreateTextMessageRequest(BaseModel):
