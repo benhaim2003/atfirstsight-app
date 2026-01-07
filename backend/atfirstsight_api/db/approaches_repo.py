@@ -3,7 +3,7 @@ from uuid import UUID
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
 
-from atfirstsight_api.db.exceptions import (DBException)
+from atfirstsight_api.db.exceptions import DBException
 
 
 class ApproachesRepo:
