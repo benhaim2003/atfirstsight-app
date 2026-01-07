@@ -70,4 +70,4 @@ class ChatsListItem(BaseModel):
 
 
 class ChatsList(BaseModel):
-    chats: ChatsListItem | None = None
+    chats: list[ChatsListItem] | None = None
