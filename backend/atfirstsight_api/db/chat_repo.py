@@ -69,11 +69,11 @@ class ChatsRepo:
                              """
 
         try:
-            participant_a_data = await self._connection.fetch(user_profile_query, user_id)
-            participant_a_dict = dict(participant_a_data[0])
+            participant_a_data = await self._connection.fetchrow(user_profile_query, user_id)
+            participant_a_dict = dict(participant_a_data)
             participant_a = ChatParticipant(
-                profile_id=participant_a_dict.get('id'),
-                username=participant_a_dict.get('username'),
+                profile_id=participant_a_dict['id'],
+                username=participant_a_dict['username'],
                 primary_photo_url=participant_a_dict.get('storage_path')
             )
 
@@ -83,28 +83,28 @@ class ChatsRepo:
                 row_dict = dict(row)
 
                 participant_b = ChatParticipant(
-                    profile_id=row_dict.get('other_profile_id'),
-                    username=row_dict.get('other_username'),
+                    profile_id=row_dict['other_profile_id'],
+                    username=row_dict['other_username'],
                     primary_photo_url=row_dict.get('other_primary_photo_url')
                 )
 
                 chat = Chat(
-                    id=row_dict.get('chat_id'),
+                    id=row_dict['chat_id'],
                     participant_a=participant_a,
                     participant_b=participant_b,
-                    created_at=row_dict.get('created_at'),
-                    updated_at=row_dict.get('updated_at')
+                    created_at=row_dict['created_at'],
+                    updated_at=row_dict['updated_at']
                 )
 
                 if row_dict.get('last_message_id'):
                     last_message = Message(
-                        id=row_dict.get('last_message_id'),
-                        chat_id=row_dict.get('chat_id'),
-                        sender_id=row_dict.get('last_message_sender_id'),
-                        content=row_dict.get('last_message_content'),
-                        created_at=row_dict.get('last_message_created_at'),
+                        id=row_dict['last_message_id'],
+                        chat_id=row_dict['chat_id'],
+                        sender_id=row_dict['last_message_sender_id'],
+                        content=row_dict['last_message_content'],
+                        created_at=row_dict['last_message_created_at'],
                         read_at=row_dict.get('last_message_read_at'),
-                        msg_type=row_dict.get('last_message_msg_type'),
+                        msg_type=row_dict['last_message_msg_type'],
                         metadata=row_dict.get('last_message_metadata')
                     )
                 else:
@@ -181,15 +181,15 @@ class ChatsRepo:
                 row_dict = dict(row)
                 if user_id == row_dict.get('profile_id'):
                     participant_a = ChatParticipant(
-                        profile_id=row_dict.get('profile_id'),
-                        username=row_dict.get('username'),
+                        profile_id=row_dict['profile_id'],
+                        username=row_dict['username'],
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
                 else:
                     # TODO: think what should happened if profile_b has been deleted (should the chat be deleted too?) should we add an "is active" to profiles to not delete them even if a profile got deleted?
                     participant_b = ChatParticipant(
-                        profile_id=row_dict.get('profile_id'),
-                        username=row_dict.get('username'),
+                        profile_id=row_dict['profile_id'],
+                        username=row_dict['username'],
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
 
