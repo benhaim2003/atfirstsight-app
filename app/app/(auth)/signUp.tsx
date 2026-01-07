@@ -1,11 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native'; // Keep Alert for validation
+import { Alert, View } from 'react-native'; 
 import { signUp } from '@/src/services/authServices';
 import { User } from '@/src/types/user';
 import { useUserStore } from '@/src/store/useUserStore';
 
-// Gluestack UI Imports (Consistent with Login)
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { FormControl } from '@/components/ui/form-control';
 import { VStack } from '@/components/ui/vstack';
@@ -27,12 +26,10 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // Visibility Toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleSignUp = () => {
-    // Basic Client-Side Validation
+  const handleSignUp = async () => {
     if (!email || !password || !confirmPassword) {
         Alert.alert('Missing Info', 'Please fill in all fields.');
         return;
@@ -43,15 +40,13 @@ export default function SignUpScreen() {
       return;
     }
     
-    // Attempt Sign Up
-    const user: User | null = signUp(email, password); // Assuming signUp returns null on fail based on previous logic pattern
+    const user = await signUp(email, password);
     
     if (user) {
         console.log("Sign up successful - email: ", user.email);
         setUser(user);
         router.push("/(auth)/profileCreation");
     } else {
-        // Handle mock error
         Alert.alert('Error', 'Could not create account.');
     }
   };

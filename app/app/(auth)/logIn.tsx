@@ -25,15 +25,15 @@ export default function LogInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogIn = () => {
-    const user: User | null = logIn(email, password);
+  const handleLogIn = async () => {
+    const user = await logIn(email, password);
     
     if(!user) {
       console.log("FAILED!! ==>>> Could not log in to ", email)
-      // Ideally, add a Toast or Error message state here
     }
     else {
-      console.log("Log In successful - email: ", user.email)
+      console.log("Log In successful - email: ", user.id)
+      setUser(user);
       router.push("/profileCreation")
     }
   };
