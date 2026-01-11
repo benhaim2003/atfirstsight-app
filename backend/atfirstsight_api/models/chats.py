@@ -71,3 +71,13 @@ class ChatsListItem(BaseModel):
 
 class ChatsList(BaseModel):
     chats: list[ChatsListItem] | None = None
+
+
+class ApproachRequest(BaseModel):
+    id: UUID
+    created_at: datetime
+    requester_id: UUID
+    receiver_id: UUID
+    status: str
+    expires_at: datetime | None = None
+    verification_token: str

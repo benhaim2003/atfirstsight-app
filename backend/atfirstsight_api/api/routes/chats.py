@@ -43,7 +43,7 @@ async def upload_chat(
             detail="You cannot create a chat with yourself."
         )
 
-    approach_status = await db.approaches.get_approach_status(
+    approach_status = await db.approaches.get_approach_by_users_ids(
         user_a=current_user.id,
         user_b=target_id,
     )
