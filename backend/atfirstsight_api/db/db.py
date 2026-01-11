@@ -2,7 +2,7 @@ from asyncpg import Connection
 
 from atfirstsight_api.db.profiles_repo import ProfilesRepo
 from atfirstsight_api.db.chat_repo import ChatsRepo
-from atfirstsight_api.db.approaches_repo import ApproachesRepo
+from atfirstsight_api.db.approach_requests_repo import ApproachesRepo
 
 
 class DB:
