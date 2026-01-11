@@ -1,14 +1,10 @@
-import uuid
-from datetime import datetime
 from uuid import UUID
 
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
-from pydantic import TypeAdapter
 
-from atfirstsight_api.api.api_models.chats import CreateMessageSchema
-from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDenied)
-from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
+from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException)
+from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem, ChatPreview
 
 
 class ChatsRepo:
@@ -69,11 +65,11 @@ class ChatsRepo:
                              """
 
         try:
-            participant_a_data = await self._connection.fetch(user_profile_query, user_id)
-            participant_a_dict = dict(participant_a_data[0])
+            participant_a_data = await self._connection.fetchrow(user_profile_query, user_id)
+            participant_a_dict = dict(participant_a_data)
             participant_a = ChatParticipant(
-                profile_id=participant_a_dict.get('id'),
-                username=participant_a_dict.get('username'),
+                profile_id=participant_a_dict['id'],
+                username=participant_a_dict['username'],
                 primary_photo_url=participant_a_dict.get('storage_path')
             )
 
@@ -83,28 +79,27 @@ class ChatsRepo:
                 row_dict = dict(row)
 
                 participant_b = ChatParticipant(
-                    profile_id=row_dict.get('other_profile_id'),
-                    username=row_dict.get('other_username'),
+                    profile_id=row_dict['other_profile_id'],
+                    username=row_dict['other_username'],
                     primary_photo_url=row_dict.get('other_primary_photo_url')
                 )
 
-                chat = Chat(
-                    id=row_dict.get('chat_id'),
+                chat_preview = ChatPreview(
+                    id=row_dict['chat_id'],
                     participant_a=participant_a,
                     participant_b=participant_b,
-                    created_at=row_dict.get('created_at'),
-                    updated_at=row_dict.get('updated_at')
+                    updated_at=row_dict['updated_at']
                 )
 
                 if row_dict.get('last_message_id'):
                     last_message = Message(
-                        id=row_dict.get('last_message_id'),
-                        chat_id=row_dict.get('chat_id'),
-                        sender_id=row_dict.get('last_message_sender_id'),
-                        content=row_dict.get('last_message_content'),
-                        created_at=row_dict.get('last_message_created_at'),
+                        id=row_dict['last_message_id'],
+                        chat_id=row_dict['chat_id'],
+                        sender_id=row_dict['last_message_sender_id'],
+                        content=row_dict['last_message_content'],
+                        created_at=row_dict['last_message_created_at'],
                         read_at=row_dict.get('last_message_read_at'),
-                        msg_type=row_dict.get('last_message_msg_type'),
+                        msg_type=row_dict['last_message_msg_type'],
                         metadata=row_dict.get('last_message_metadata')
                     )
                 else:
@@ -112,7 +107,7 @@ class ChatsRepo:
 
                 chat_previews.append(
                     ChatsListItem(
-                        chat=chat,
+                        chat_preview=chat_preview,
                         last_message=last_message
                     )
                 )
@@ -122,38 +117,37 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat list from db, {e}") from e
 
-    async def post_chat(self, users_ids: list[UUID]) -> UUID:
-        post_chat_query = """
-                          WITH ins AS (
-                          INSERT
-                          INTO public.chats (profile_a_id, profile_b_id)
-                          VALUES ($1, $2)
-                          ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
-                              RETURNING id
-                              )
-                          SELECT id
-                          FROM ins
-                          UNION ALL
-                          SELECT id
-                          FROM public.chats
-                          WHERE profile_a_id = $1
-                            AND profile_b_id = $2 LIMIT 1;
-                          """
-
+    async def insert_chat(self, chat: Chat) -> UUID:
+        insert_chat_query = """
+                            WITH ins AS (
+                            INSERT
+                            INTO public.chats (id, profile_a_id, profile_b_id, created_at, updated_at)
+                            VALUES ($1, $2, $3, $4, $5)
+                            ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
+                                RETURNING id
+                                )
+                            SELECT id
+                            FROM ins
+                            UNION ALL
+                            SELECT id
+                            FROM public.chats
+                            WHERE profile_a_id = $1
+                              AND profile_b_id = $2 LIMIT 1; \
+                            """
+        users_ids = [chat.profile_a_id, chat.profile_b_id]
         users_ids = sorted(users_ids)
         user_a_id = users_ids[0]
         user_b_id = users_ids[1]
-
         try:
-            chat_id = await self._connection.fetchval(post_chat_query, user_a_id, user_b_id)
+            chat_id = await self._connection.fetchval(insert_chat_query, chat.id, user_a_id, user_b_id,
+                                                      chat.created_at, chat.updated_at)
             return chat_id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
-    async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat | None:
+    async def get_chat(self, chat_id: UUID, user_id: UUID) -> ChatPreview | None:
         get_chat_query = """
                          SELECT c.id            as chat_id
-                              , c.created_at
                               , c.updated_at
                               , p.id            as profile_id
                               , p.username
@@ -165,42 +159,38 @@ class ChatsRepo:
                                   LEFT JOIN profile_photos pp
                                             ON pp.profile_id = p.id
                          WHERE c.id = $1
+                           and (c.profile_a_id = $2 or c.profile_b_id = $2)
                          """
         try:
-            rows = await self._connection.fetch(get_chat_query, chat_id)
+            rows = await self._connection.fetch(get_chat_query, chat_id, user_id)
             if not rows:
                 raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
 
             participant_a = None
             participant_b = None
 
-            chat_created_at = rows[0]['created_at']
             chat_updated_at = rows[0]['updated_at']
 
             for row in rows:
                 row_dict = dict(row)
                 if user_id == row_dict.get('profile_id'):
                     participant_a = ChatParticipant(
-                        profile_id=row_dict.get('profile_id'),
-                        username=row_dict.get('username'),
+                        profile_id=row_dict['profile_id'],
+                        username=row_dict['username'],
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
                 else:
                     # TODO: think what should happened if profile_b has been deleted (should the chat be deleted too?) should we add an "is active" to profiles to not delete them even if a profile got deleted?
                     participant_b = ChatParticipant(
-                        profile_id=row_dict.get('profile_id'),
-                        username=row_dict.get('username'),
+                        profile_id=row_dict['profile_id'],
+                        username=row_dict['username'],
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
 
-            if not participant_a:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
-
-            chat = Chat(
+            chat = ChatPreview(
                 id=chat_id,
                 participant_a=participant_a,
                 participant_b=participant_b,
-                created_at=chat_created_at,
                 updated_at=chat_updated_at
             )
 
@@ -209,12 +199,7 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
-
     async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
-        check_query = """
-                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1) as chat_exists,
-                             EXISTS(SELECT 1 FROM public.chats WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
-                      """
         query = """
                 SELECT id, \
                        chat_id, \
@@ -230,59 +215,64 @@ class ChatsRepo:
                     LIMIT $2 \
                 OFFSET $3; \
                 """
+        if not self._user_is_participant(chat_id, user_id):
+            raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
         try:
-            row = await self._connection.fetchrow(check_query, chat_id, user_id)
-
-            if not row['chat_exists']:
-                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
-            if not row['is_participant']:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
-
             rows = await self._connection.fetch(query, chat_id, limit, skip)
-            return TypeAdapter(list[Message]).validate_python([dict(r) for r in rows])
+            return [Message.model_validate(dict(r)) for r in rows]
 
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
-
-    async def post_chat_messages(self, chat_id: UUID, user_id: UUID, message_payload: CreateMessageSchema) -> UUID:
-        check_query = """
-                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
-                             EXISTS(SELECT 1 \
-                                    FROM public.chats \
-                                    WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant \
-                      """
-        post_chat_massage_query = """
-                                    INSERT INTO public.messages (
-                                        id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
-                                    )
-                                    VALUES (
-                                        $1, $2, $3, $4, $5, $6, $7, $8
-                                    )
-                                    RETURNING id;
-                                """
-
-        full_message_data = message_payload.model_dump()
-        full_message_data.update({
-            "id": uuid.uuid4(),
-            "chat_id": chat_id,
-            "sender_id": user_id,
-            "created_at": datetime.now(),
-            "read_at": None
-        })
-        message_obj = TypeAdapter(Message).validate_python(full_message_data)
-
+    async def insert_chat_messages(self, message_payload: Message) -> None:
+        insert_chat_massage_query = """
+                                    INSERT INTO public.messages (id, chat_id, sender_id, content, msg_type, metadata,
+                                                                 created_at, read_at)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id; \
+                                    """
+        if not self._user_is_participant(message_payload.chat_id, message_payload.sender_id):
+            raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
         try:
-            row = await self._connection.fetchrow(check_query, chat_id, user_id)
-            if not row['chat_exists']:
-                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
-            if not row['is_participant']:
-                raise AccessDenied(f"User {user_id} is not a participant in chat {chat_id}.")
-
-            await self._connection.fetchval(post_chat_massage_query, message_obj.id, message_obj.chat_id,
-                                                      message_obj.sender_id, message_obj.content,
-                                                      message_obj.msg_type, message_obj.metadata,
-                                                      message_obj.created_at, message_obj.read_at)
-            return message_obj.id
+            await self._connection.fetchval(insert_chat_massage_query, message_payload.id, message_payload.chat_id,
+                                            message_payload.sender_id, message_payload.content,
+                                            message_payload.msg_type, message_payload.metadata,
+                                            message_payload.created_at, message_payload.read_at)
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
+
+    async def delete_chat_message(self, message_id: UUID, user_id: UUID) -> None:
+        try:
+            chat_id = await self._connection.fetchval(
+                """
+                SELECT chat_id
+                FROM public.messages
+                WHERE id = $1
+                """,
+                message_id)
+            if chat_id is None:
+                raise ItemNotFoundException(f"Message or Chat not found.")
+            if not self._user_is_participant(chat_id, user_id):
+                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
+
+            await self._connection.execute(
+                """
+                DELETE
+                FROM public.messages
+                WHERE id = $1
+                """,
+                message_id
+            )
+        except PostgresError as e:
+            raise DBException("Failed deleting profile photo to db") from e
+
+    async def _user_is_participant(self, chat_id: UUID, user_id: UUID) -> bool:
+        check_query = """
+                      SELECT EXISTS(SELECT 1
+                                    FROM public.chats
+                                    WHERE id = $1
+                                      AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
+                      """
+        try:
+            return await self._connection.fetchval(check_query, chat_id, user_id)
+        except PostgresError as e:
+            raise DBException(f"Failed checking if {user_id} is participant in {chat_id} chat, {e}") from e

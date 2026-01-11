@@ -4,6 +4,8 @@ from supabase import StorageException as SupabaseStorageException
 from atfirstsight_api.storage.exceptions import StorageException
 
 PROFILE_PHOTOS_BUCKET = "profile_photos"
+PHOTO_MESSAGES_BUCKET = "photos_massages"
+AUDIO_MESSAGE_BUCKET = "audio_messages"
 
 class Storage:
     def __init__(self, supabase_client: AsyncClient) -> None:

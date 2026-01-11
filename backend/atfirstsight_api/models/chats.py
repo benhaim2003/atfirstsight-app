@@ -50,24 +50,41 @@ class AudioMessage(MessageBase):
 Message = Union[TextMessage, ImageMessage, AudioMessage]
 
 
+class Chat(BaseModel):
+    id: UUID = Field(default_factory=uuid.uuid4)
+    profile_a_id: UUID
+    profile_b_id: UUID
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
 class ChatParticipant(BaseModel):
     profile_id: UUID
     username: str
     primary_photo_url: str | None = None
 
 
-class Chat(BaseModel):
-    id: UUID = Field(default_factory=uuid.uuid4)
+class ChatPreview(BaseModel):
+    id: UUID = UUID
     participant_a: ChatParticipant
     participant_b: ChatParticipant
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime
 
 
 class ChatsListItem(BaseModel):
-    chat: Chat
+    chat_preview: ChatPreview
     last_message: Message | None = None
 
 
 class ChatsList(BaseModel):
-    chats: ChatsListItem | None = None
+    chats: list[ChatsListItem] | None = None
+
+
+class ApproachRequest(BaseModel):
+    id: UUID
+    created_at: datetime
+    requester_id: UUID
+    receiver_id: UUID
+    status: str
+    expires_at: datetime | None = None
+    verification_token: str

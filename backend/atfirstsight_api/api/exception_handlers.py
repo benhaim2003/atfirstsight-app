@@ -1,7 +1,11 @@
 from fastapi import Request, FastAPI
 from fastapi.responses import JSONResponse
 
-from atfirstsight_api.db.exceptions import ItemNotFoundException, DuplicateItemException
+from atfirstsight_api.db.exceptions import ItemNotFoundException, DuplicateItemException, DBException
+
+
+async def db_exception_handler(_: Request, exc: DBException) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 async def item_not_found_exception_handler(_: Request, exc: ItemNotFoundException) -> JSONResponse:
@@ -13,5 +17,6 @@ async def duplicate_item_exception_handler(_: Request, exc: DuplicateItemExcepti
 
 
 def add_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(DBException, db_exception_handler)
     app.add_exception_handler(ItemNotFoundException, item_not_found_exception_handler)
     app.add_exception_handler(DuplicateItemException, duplicate_item_exception_handler)
