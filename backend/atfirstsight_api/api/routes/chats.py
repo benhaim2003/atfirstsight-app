@@ -47,11 +47,11 @@ async def upload_chat(
             detail="You cannot create a chat with yourself."
         )
 
-    approach_status = await db.approaches.get_approach_by_users_ids(
+    approach_request = await db.approaches.get_approach_by_users_ids(
         user_a=current_user.id,
         user_b=target_id,
     )
-    if approach_status != 'verified':
+    if approach_request.status != 'verified':
         raise HTTPException(
             status_code=403,
             detail="You cannot start a chat without a real meeting experience."
