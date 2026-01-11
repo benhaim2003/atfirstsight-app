@@ -50,18 +50,18 @@ class AudioMessage(MessageBase):
 Message = Union[TextMessage, ImageMessage, AudioMessage]
 
 
-class ChatParticipant(BaseModel):
-    profile_id: UUID
-    username: str
-    primary_photo_url: str | None = None
-
-
 class Chat(BaseModel):
     id: UUID = Field(default_factory=uuid.uuid4)
     profile_a_id: UUID
     profile_b_id: UUID
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class ChatParticipant(BaseModel):
+    profile_id: UUID
+    username: str
+    primary_photo_url: str | None = None
 
 
 class ChatPreview(BaseModel):

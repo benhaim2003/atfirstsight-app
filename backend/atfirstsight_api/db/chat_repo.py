@@ -148,7 +148,6 @@ class ChatsRepo:
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> ChatPreview | None:
         get_chat_query = """
                          SELECT c.id            as chat_id
-                              , c.created_at
                               , c.updated_at
                               , p.id            as profile_id
                               , p.username
@@ -170,7 +169,6 @@ class ChatsRepo:
             participant_a = None
             participant_b = None
 
-            chat_created_at = rows[0]['created_at']
             chat_updated_at = rows[0]['updated_at']
 
             for row in rows:
