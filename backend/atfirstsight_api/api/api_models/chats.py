@@ -18,13 +18,13 @@ class CreateTextMessageRequest(BaseModel):
 
 class CreateImageMessageRequest(BaseModel):
     msg_type: Literal[MessageType.IMAGE] = MessageType.IMAGE
-    content: str
+    content: None = None
     metadata: ImageMetaData
 
 
 class CreateAudioMessageRequest(BaseModel):
     msg_type: Literal[MessageType.AUDIO] = MessageType.AUDIO
-    content: str
+    content: None = None
     metadata: AudioMetaData
 
 

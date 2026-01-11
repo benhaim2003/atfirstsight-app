@@ -219,31 +219,28 @@ class ChatsRepo:
                     LIMIT $2 \
                 OFFSET $3; \
                 """
+        if not self._user_is_participant(chat_id, user_id):
+            raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
         try:
-            if not self._user_is_participant(chat_id, user_id):
-                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
-
             rows = await self._connection.fetch(query, chat_id, limit, skip)
             return [Message.model_validate(dict(r)) for r in rows]
 
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
-    async def insert_chat_messages(self, message_payload: Message) -> UUID:
+    async def insert_chat_messages(self, message_payload: Message) -> None:
         insert_chat_massage_query = """
                                     INSERT INTO public.messages (id, chat_id, sender_id, content, msg_type, metadata,
                                                                  created_at, read_at)
                                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id; \
                                     """
+        if not self._user_is_participant(message_payload.chat_id, message_payload.sender_id):
+            raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
         try:
-            if not self._user_is_participant(message_payload.chat_id, message_payload.sender_id):
-                raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
-
             await self._connection.fetchval(insert_chat_massage_query, message_payload.id, message_payload.chat_id,
                                             message_payload.sender_id, message_payload.content,
                                             message_payload.msg_type, message_payload.metadata,
                                             message_payload.created_at, message_payload.read_at)
-            return message_payload.id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
