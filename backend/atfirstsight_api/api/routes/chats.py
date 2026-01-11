@@ -11,7 +11,7 @@ from atfirstsight_api.api.dependencies.db import DBDep
 from atfirstsight_api.api.dependencies.storage import StorageDep
 from atfirstsight_api.api.routes.profiles import _get_file_hash
 from atfirstsight_api.db.exceptions import DBException
-from atfirstsight_api.models.chats import ChatsList, Chat, Message
+from atfirstsight_api.models.chats import ChatsList, Chat, Message, ChatPreview
 from atfirstsight_api.storage.storage import PHOTO_MESSAGES_BUCKET, AUDIO_MESSAGE_BUCKET
 
 router = APIRouter(prefix="/chats", tags=["chats"], dependencies=[Depends(get_user)])
@@ -56,9 +56,14 @@ async def upload_chat(
             status_code=403,
             detail="You cannot start a chat without a real meeting experience."
         )
-
-    chat_participants = [current_user.id, target_id]
-    chat_id = await db.chats.insert_chat(chat_participants)
+    chat = Chat(
+        id=uuid.uuid4(),
+        profile_a_id= current_user.id,
+        profile_b_id= target_id,
+        created_at=datetime.now(),
+        updated_at=datetime.now()
+    )
+    chat_id = await db.chats.insert_chat(chat)
     return chat_id
 
 
@@ -67,9 +72,9 @@ async def get_chat(
         chat_id: UUID,
         db: DBDep,
         current_user: UserDep,
-) -> Chat:
-    chat = await db.chats.get_chat(chat_id, current_user.id)
-    return chat
+) -> ChatPreview:
+    chat_preview = await db.chats.get_chat(chat_id, current_user.id)
+    return chat_preview
 
 
 @router.get("/{chat_id}/messages", summary="Get specific chat messages")

@@ -4,7 +4,7 @@ from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
 
 from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException)
-from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
+from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem, ChatPreview
 
 
 class ChatsRepo:
@@ -84,11 +84,10 @@ class ChatsRepo:
                     primary_photo_url=row_dict.get('other_primary_photo_url')
                 )
 
-                chat = Chat(
+                chat_preview = ChatPreview(
                     id=row_dict['chat_id'],
                     participant_a=participant_a,
                     participant_b=participant_b,
-                    created_at=row_dict['created_at'],
                     updated_at=row_dict['updated_at']
                 )
 
@@ -108,7 +107,7 @@ class ChatsRepo:
 
                 chat_previews.append(
                     ChatsListItem(
-                        chat=chat,
+                        chat_preview=chat_preview,
                         last_message=last_message
                     )
                 )
@@ -118,12 +117,12 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat list from db, {e}") from e
 
-    async def insert_chat(self, users_ids: list[UUID]) -> UUID:
+    async def insert_chat(self, chat: Chat) -> UUID:
         insert_chat_query = """
                             WITH ins AS (
                             INSERT
-                            INTO public.chats (profile_a_id, profile_b_id)
-                            VALUES ($1, $2)
+                            INTO public.chats (id, profile_a_id, profile_b_id, created_at, updated_at)
+                            VALUES ($1, $2, $3, $4, $5)
                             ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
                                 RETURNING id
                                 )
@@ -135,18 +134,18 @@ class ChatsRepo:
                             WHERE profile_a_id = $1
                               AND profile_b_id = $2 LIMIT 1; \
                             """
-
+        users_ids = [chat.profile_a_id, chat.profile_b_id]
         users_ids = sorted(users_ids)
         user_a_id = users_ids[0]
         user_b_id = users_ids[1]
-
         try:
-            chat_id = await self._connection.fetchval(insert_chat_query, user_a_id, user_b_id)
+            chat_id = await self._connection.fetchval(insert_chat_query, chat.id, user_a_id, user_b_id,
+                                                      chat.created_at, chat.updated_at)
             return chat_id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
-    async def get_chat(self, chat_id: UUID, user_id: UUID) -> Chat | None:
+    async def get_chat(self, chat_id: UUID, user_id: UUID) -> ChatPreview | None:
         get_chat_query = """
                          SELECT c.id            as chat_id
                               , c.created_at
@@ -190,11 +189,10 @@ class ChatsRepo:
                         primary_photo_url=row_dict.get('primary_photo_url')
                     )
 
-            chat = Chat(
+            chat = ChatPreview(
                 id=chat_id,
                 participant_a=participant_a,
                 participant_b=participant_b,
-                created_at=chat_created_at,
                 updated_at=chat_updated_at
             )
 
@@ -244,12 +242,13 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
-
     async def delete_chat_message(self, message_id: UUID, user_id: UUID) -> None:
         try:
             chat_id = await self._connection.fetchval(
-                    """
-                SELECT chat_id FROM public.messages WHERE id = $1
+                """
+                SELECT chat_id
+                FROM public.messages
+                WHERE id = $1
                 """,
                 message_id)
             if chat_id is None:
@@ -259,14 +258,14 @@ class ChatsRepo:
 
             await self._connection.execute(
                 """
-                DELETE FROM public.messages
+                DELETE
+                FROM public.messages
                 WHERE id = $1
                 """,
                 message_id
             )
         except PostgresError as e:
             raise DBException("Failed deleting profile photo to db") from e
-
 
     async def _user_is_participant(self, chat_id: UUID, user_id: UUID) -> bool:
         check_query = """

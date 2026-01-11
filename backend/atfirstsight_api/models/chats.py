@@ -58,14 +58,21 @@ class ChatParticipant(BaseModel):
 
 class Chat(BaseModel):
     id: UUID = Field(default_factory=uuid.uuid4)
-    participant_a: ChatParticipant
-    participant_b: ChatParticipant
+    profile_a_id: UUID
+    profile_b_id: UUID
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
+class ChatPreview(BaseModel):
+    id: UUID = UUID
+    participant_a: ChatParticipant
+    participant_b: ChatParticipant
+    updated_at: datetime
+
+
 class ChatsListItem(BaseModel):
-    chat: Chat
+    chat_preview: ChatPreview
     last_message: Message | None = None
 
 
