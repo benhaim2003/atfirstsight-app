@@ -104,4 +104,11 @@ async def upload_chat_message(
         whole_message_data
     )
 
-    return result
+
+@router.delete("/{chat_id}/messages", summary="Delete a message from a chat")
+async def delete_chat_message(
+        message_id: UUID,
+        db: DBDep,
+        current_user: UserDep,
+) -> None:
+    await db.chats.delete_chat_message(message_id, current_user.id)

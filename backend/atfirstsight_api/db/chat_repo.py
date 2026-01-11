@@ -247,6 +247,30 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
 
+
+    async def delete_chat_message(self, message_id: UUID, user_id: UUID) -> None:
+        try:
+            chat_id = await self._connection.fetchval(
+                    """
+                SELECT chat_id FROM public.messages WHERE id = $1
+                """,
+                message_id)
+            if chat_id is None:
+                raise ItemNotFoundException(f"Message or Chat not found.")
+            if not self._user_is_participant(chat_id, user_id):
+                raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
+
+            await self._connection.execute(
+                """
+                DELETE FROM public.messages
+                WHERE id = $1
+                """,
+                message_id
+            )
+        except PostgresError as e:
+            raise DBException("Failed deleting profile photo to db") from e
+
+
     async def _user_is_participant(self, chat_id: UUID, user_id: UUID) -> bool:
         check_query = """
                       SELECT EXISTS(SELECT 1
