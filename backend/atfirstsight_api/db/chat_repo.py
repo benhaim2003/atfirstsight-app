@@ -208,10 +208,6 @@ class ChatsRepo:
 
 
     async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
-        check_query = """
-                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1) as chat_exists,
-                             EXISTS(SELECT 1 FROM public.chats WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
-                      """
         query = """
                 SELECT id, \
                        chat_id, \
@@ -228,12 +224,8 @@ class ChatsRepo:
                 OFFSET $3; \
                 """
         try:
-            row = await self._connection.fetchrow(check_query, chat_id, user_id)
-
-            if not row['chat_exists']:
+            if not self._user_is_participant(chat_id, user_id):
                 raise ItemNotFoundException(f"Chat with id {chat_id} not found.")
-            if not row['is_participant']:
-                raise AccessDeniedException(f"User {user_id} is not a participant in chat {chat_id}.")
 
             rows = await self._connection.fetch(query, chat_id, limit, skip)
             return [Message.model_validate(dict(r)) for r in rows]
@@ -243,12 +235,6 @@ class ChatsRepo:
 
 
     async def insert_chat_messages(self, message_payload: Message) -> UUID:
-        check_query = """
-                      SELECT EXISTS(SELECT 1 FROM public.chats WHERE id = $1)                   as chat_exists,
-                             EXISTS(SELECT 1 \
-                                    FROM public.chats \
-                                    WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant \
-                      """
         insert_chat_massage_query = """
                                     INSERT INTO public.messages (
                                         id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
@@ -259,11 +245,8 @@ class ChatsRepo:
                                     RETURNING id;
                                 """
         try:
-            row = await self._connection.fetchrow(check_query, message_payload.chat_id, message_payload.sender_id)
-            if not row['chat_exists']:
+            if not self._user_is_participant(message_payload.chat_id, message_payload.sender_id):
                 raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
-            if not row['is_participant']:
-                raise AccessDeniedException(f"User {message_payload.sender_id} is not a participant in chat {message_payload.sender_id}.")
 
             await self._connection.fetchval(insert_chat_massage_query, message_payload.id, message_payload.chat_id,
                                                       message_payload.sender_id, message_payload.content,
@@ -272,3 +255,15 @@ class ChatsRepo:
             return message_payload.id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
+
+
+    async def _user_is_participant(self, chat_id: UUID, user_id: UUID) -> bool:
+        check_query = """
+                      SELECT EXISTS(SELECT 1
+                                    FROM public.chats
+                                    WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
+                      """
+        try:
+            return await self._connection.fetchval(check_query, chat_id, user_id)
+        except PostgresError as e:
+            raise DBException(f"Failed checking if {user_id} is participant in {chat_id} chat, {e}") from e
