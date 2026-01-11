@@ -1,13 +1,9 @@
-import uuid
-from datetime import datetime
 from uuid import UUID
 
 from asyncpg import Connection
 from asyncpg.exceptions import PostgresError
-from pydantic import TypeAdapter
 
-from atfirstsight_api.api.api_models.chats import CreateMessageRequest
-from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException, AccessDeniedException)
+from atfirstsight_api.db.exceptions import (DBException, ItemNotFoundException)
 from atfirstsight_api.models.chats import Chat, ChatParticipant, Message, ChatsListItem
 
 
@@ -124,21 +120,21 @@ class ChatsRepo:
 
     async def insert_chat(self, users_ids: list[UUID]) -> UUID:
         insert_chat_query = """
-                          WITH ins AS (
-                          INSERT
-                          INTO public.chats (profile_a_id, profile_b_id)
-                          VALUES ($1, $2)
-                          ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
-                              RETURNING id
-                              )
-                          SELECT id
-                          FROM ins
-                          UNION ALL
-                          SELECT id
-                          FROM public.chats
-                          WHERE profile_a_id = $1
-                            AND profile_b_id = $2 LIMIT 1;
-                          """
+                            WITH ins AS (
+                            INSERT
+                            INTO public.chats (profile_a_id, profile_b_id)
+                            VALUES ($1, $2)
+                            ON CONFLICT (profile_a_id, profile_b_id) DO NOTHING
+                                RETURNING id
+                                )
+                            SELECT id
+                            FROM ins
+                            UNION ALL
+                            SELECT id
+                            FROM public.chats
+                            WHERE profile_a_id = $1
+                              AND profile_b_id = $2 LIMIT 1; \
+                            """
 
         users_ids = sorted(users_ids)
         user_a_id = users_ids[0]
@@ -164,7 +160,8 @@ class ChatsRepo:
                              --TODO: make sure each profile has at most 1 profile_photo or use LATERAL JOIN
                                   LEFT JOIN profile_photos pp
                                             ON pp.profile_id = p.id
-                         WHERE c.id = $1 and (c.profile_a_id = $2 or c.profile_b_id = $2)
+                         WHERE c.id = $1
+                           and (c.profile_a_id = $2 or c.profile_b_id = $2)
                          """
         try:
             rows = await self._connection.fetch(get_chat_query, chat_id, user_id)
@@ -206,7 +203,6 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
-
     async def get_chat_messages(self, chat_id: UUID, user_id: UUID, limit: int, skip: int) -> list[Message]:
         query = """
                 SELECT id, \
@@ -233,35 +229,30 @@ class ChatsRepo:
         except PostgresError as e:
             raise DBException(f"Failed getting chat from db, {e}") from e
 
-
     async def insert_chat_messages(self, message_payload: Message) -> UUID:
         insert_chat_massage_query = """
-                                    INSERT INTO public.messages (
-                                        id, chat_id, sender_id, content, msg_type, metadata, created_at, read_at
-                                    )
-                                    VALUES (
-                                        $1, $2, $3, $4, $5, $6, $7, $8
-                                    )
-                                    RETURNING id;
-                                """
+                                    INSERT INTO public.messages (id, chat_id, sender_id, content, msg_type, metadata,
+                                                                 created_at, read_at)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id; \
+                                    """
         try:
             if not self._user_is_participant(message_payload.chat_id, message_payload.sender_id):
                 raise ItemNotFoundException(f"Chat with id {message_payload.chat_id} not found.")
 
             await self._connection.fetchval(insert_chat_massage_query, message_payload.id, message_payload.chat_id,
-                                                      message_payload.sender_id, message_payload.content,
-                                                      message_payload.msg_type, message_payload.metadata,
-                                                      message_payload.created_at, message_payload.read_at)
+                                            message_payload.sender_id, message_payload.content,
+                                            message_payload.msg_type, message_payload.metadata,
+                                            message_payload.created_at, message_payload.read_at)
             return message_payload.id
         except PostgresError as e:
             raise DBException(f"Failed creating chat in db, {e}") from e
-
 
     async def _user_is_participant(self, chat_id: UUID, user_id: UUID) -> bool:
         check_query = """
                       SELECT EXISTS(SELECT 1
                                     FROM public.chats
-                                    WHERE id = $1 AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
+                                    WHERE id = $1
+                                      AND (profile_a_id = $2 or profile_b_id = $2)) as is_participant
                       """
         try:
             return await self._connection.fetchval(check_query, chat_id, user_id)
