@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from asyncpg import Connection, PostgresError
@@ -27,6 +28,10 @@ class PreferencesRepo:
             raise DBException(f"Failed getting {profile_id} profile preferences from db") from e
 
     async def insert_profile_preferences(self, profile_preferences: ProfilePreferences) -> None:
+        gender_pref_json = None
+        if profile_preferences.gender_pref:
+            gender_pref_json = json.dumps([g.value for g in profile_preferences.gender_pref])
+
         try:
             await self._connection.execute(
                 """
@@ -43,7 +48,7 @@ class PreferencesRepo:
                 profile_preferences.profile_id,
                 profile_preferences.min_age,
                 profile_preferences.max_age,
-                profile_preferences.gender_pref
+                gender_pref_json
             )
 
         except PostgresError as e:

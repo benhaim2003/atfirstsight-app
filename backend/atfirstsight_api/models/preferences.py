@@ -11,4 +11,4 @@ class ProfilePreferences(BaseModel):
     profile_id: UUID
     min_age: int | None = None
     max_age: int | None = None
-    gender_pref: Gender | None = None
+    gender_pref: list[Gender] | None = None
