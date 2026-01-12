@@ -24,7 +24,7 @@ class PreferencesRepo:
             return ProfilePreferences.model_validate(dict(profile_preferences_row))
 
         except PostgresError as e:
-            raise DBException("Failed getting profile photo from db") from e
+            raise DBException(f"Failed getting {profile_id} profile preferences from db") from e
 
     async def insert_profile_preferences(self, profile_preferences: ProfilePreferences) -> None:
         try:
@@ -47,4 +47,4 @@ class PreferencesRepo:
             )
 
         except PostgresError as e:
-            raise DBException("Failed getting profile photo from db") from e
+            raise DBException(f"Failed inserting {profile_preferences.profile_id} profile preferences to db") from e
