@@ -10,7 +10,7 @@ from atfirstsight_api.models.preferences import ProfilePreferences
 router = APIRouter(prefix="/preferences", tags=["preferences"], dependencies=[Depends(get_user)])
 
 
-@router.get("/{profile_id}", summary="Get specific profile preferences")
+@router.get("", summary="Get a user his profile preferences")
 async def get_profile_preference(
         db: DBDep,
         current_user: UserDep
@@ -19,7 +19,7 @@ async def get_profile_preference(
     return profile_preference
 
 
-@router.post("/{profile_id}", summary="Insert or Update specific profile preferences")
+@router.post("", summary="Insert or Update for a user his profile preferences")
 async def insert_profile_preference(
         db: DBDep,
         current_user: UserDep,
