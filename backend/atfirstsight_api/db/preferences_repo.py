@@ -15,14 +15,21 @@ class PreferencesRepo:
         try:
             profile_preferences_row = await self._connection.fetchrow(
                 """
-                SELECT * FROM public.profile_preferences WHERE profile_id = $1
+                SELECT *
+                FROM public.profile_preferences
+                WHERE profile_id = $1
                 """,
                 profile_id
             )
             if not profile_preferences_row:
                 raise ItemNotFoundException(f"Profile preferences with profile id: '{profile_id}' not found")
 
-            return ProfilePreferences.model_validate(dict(profile_preferences_row))
+            data = dict(profile_preferences_row)
+
+            if data.get('gender_pref') and isinstance(data['gender_pref'], str):
+                data['gender_pref'] = json.loads(data['gender_pref'])
+
+            return ProfilePreferences.model_validate(data)
 
         except PostgresError as e:
             raise DBException(f"Failed getting {profile_id} profile preferences from db") from e
@@ -37,9 +44,9 @@ class PreferencesRepo:
                 """
                 INSERT INTO public.profile_preferences
                     (created_at, profile_id, min_age, max_age, gender_pref)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (profile_id)
-                DO UPDATE SET
+                VALUES ($1, $2, $3, $4, $5) ON CONFLICT (profile_id)
+                DO
+                UPDATE SET
                     min_age = EXCLUDED.min_age,
                     max_age = EXCLUDED.max_age,
                     gender_pref = EXCLUDED.gender_pref
